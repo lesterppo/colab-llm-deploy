@@ -1,18 +1,31 @@
 # AGENTS.md — colab-llm-deploy
 
-Instructions for AI agents deploying LLMs on Google Colab GPUs with this repo.
-One command does everything; read this file first, then run it.
+Instructions for AI agents deploying models on Google Colab GPUs with this
+repo. Each modality has a one-command entry point; read the modality
+README first, then run it.
 
-## The one command
+## The commands
 
 ```bash
+# LLM -> public OpenAI-compatible endpoint
 python3 deploy.py deploy --model <catalog-key> [--gpu T4] [--session NAME]
-python3 deploy.py status --session NAME      # poll stage / tunnel URL
-python3 deploy.py undeploy --session NAME    # kill procs + stop session (halts billing)
+python3 deploy.py status --session NAME
+python3 deploy.py undeploy --session NAME        # kills procs + stops session
+
+# Image / video -> local file
+python3 deploy_media.py generate --kind image --model flux2-klein --prompt "..." [--out DIR]
+python3 deploy_media.py generate --kind video --model ltx23 --prompt "..." [--out DIR]
+python3 deploy_media.py status   --session NAME
+python3 deploy_media.py undeploy --session NAME
 ```
 
-`--model auto` detects GPU VRAM via nvidia-smi and picks the largest recipe
-whose `min_vram_gb` fits. `--model` also accepts any key in `models.json`.
+`deploy.py --model auto` detects GPU VRAM via nvidia-smi and picks the
+largest fitting recipe. `deploy_media.py --model` picks the pipeline:
+`flux2-klein | hidream-i1 | ltx23 | ltx23-chain`; prompts and sizes go
+through `/content/gen_config.json` so gen scripts never guess.
+
+Modality guides: [image/README.md](image/README.md),
+[video/README.md](video/README.md). LLM details below.
 
 ## Prerequisites
 
@@ -83,6 +96,28 @@ deepseek-coder-6.7b-q4, llama3.1-8b-q4.
 10. **transformers pin**: keep `transformers>=4.46,<5.0` on Colab; 5.x breaks
     things (and Colab's preinstalled deps conflict with tight pins — the
     driver avoids over-pinning).
+
+## Media pitfalls (image/video, learned live 2026-10-04/05)
+
+1. **ComfyUI must be >= 0.38** for the `flux2` CLIPLoader type (FLUX.2
+   klein); older tags 400 the workflow.
+2. **`hf` CLI preserves repo subpaths** on download
+   (`unet/distilled-1.1/x.gguf` lands nested) — flatten to the model dir
+   before the workflow runs (done in `video/ltx23/setup.py`).
+3. **`LTXVAudioVAELoader` scans `models/checkpoints/`**, not `models/vae/`
+   — copy the audio VAE there during setup.
+4. **Never BF16 + full CPU offload for DiTs on Colab**: ~15GB of weights
+   parked in the 12GB system-RAM cgroup → kernel OOM-kill. GGUF quants
+   are the way for everything here.
+5. **Q3 GGUF text encoder is mandatory for LTX-2.3** — the fp8 encoder
+   OOMs. Same class of lesson as (4): size the encoder, not just the DiT.
+6. **ComfyUI-GGUF node**: `UnetLoaderGGUF` + per-model CLIP loaders
+   (`CLIPLoader` type `flux2`, `QuadrupleCLIPLoader`,
+   `DualCLIPLoaderGGUF` type `ltxv`) — the loader must match the model.
+7. Long generations: use `exec_detach` + status-file polling (status
+   files are written at every stage); a 5-clip chain takes ~38 min —
+   well inside session lifetimes, but don't run it in a foreground
+   `exec` with a short timeout.
 
 ## Teardown discipline
 
