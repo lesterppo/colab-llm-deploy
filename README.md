@@ -1,21 +1,23 @@
 # colab-llm-deploy
 
-One-shot LLM deployment on Google Colab GPUs. Give it a GPU session, get back
-an OpenAI-compatible endpoint on a public HTTPS URL — then tear it down when
-you're done.
+One-shot model deployment on Google Colab GPUs. Give it a GPU session, get
+back a result — an OpenAI-compatible LLM endpoint, a generated image, or a
+generated video — then tear it down when you're done.
 
-> **Status: live-tested.** One-command `deploy.py` verified end to end on
-> free Colab T4s (2026-10-04): Qwen2.5-7B, Qwen2.5-14B (via `--model auto`),
-> Gemma 4 12B, Qwen3.5 9B, and MiMo-V2.6 9B (via Ollama `hf.co/` GGUF pull)
-> all deployed, served through Cloudflare tunnels, smoke-tested, and torn
-> down cleanly. See AGENTS.md for the full test matrix and pitfalls.
+| Modality | Entry point | What it does |
+|---|---|---|
+| LLM | `python3 deploy.py deploy --model auto` | Serves an Ollama/vLLM model behind a public Cloudflare-tunnel URL |
+| Image | `python3 deploy_media.py generate --kind image --model flux2-klein --prompt "..."` | Text-to-image PNG (FLUX.2-klein-4B, HiDream-I1 17B) |
+| Video | `python3 deploy_media.py generate --kind video --model ltx23 --prompt "..."` | Text-to-video MP4 (LTX-2.3 22B); `--model ltx23-chain` for longer chained videos |
 
-## For AI agents
-
-**Read [AGENTS.md](AGENTS.md) first** — it has the one-command flow,
-prerequisites, the proven-recipe table, and every pitfall learned live.
-`deploy.py deploy --model <key>` (or `--model auto`) is the entire
-interface; `models.json` keys with `"proven_t4": true` are tested.
+> **Status: live-tested on free Colab T4s.**
+> LLMs (2026-10-04): Qwen2.5-7B/14B, Gemma 4 12B, Qwen3.5 9B, MiMo-V2.6 9B —
+> all deployed, served through tunnels, smoke-tested, torn down.
+> Images (2026-10-04/05): FLUX.2-klein-4B (~70s per 1024px image),
+> HiDream-I1 17B Q4 (tight but workable).
+> Video (2026-10-05): LTX-2.3 22B Q3 (576x320 49f in ~7 min; 5-clip chain =
+> ~10.2s in ~38 min). See [AGENTS.md](AGENTS.md), [image/](image/),
+> [video/](video/) for the full test matrix and pitfalls.
 
 ## Architecture
 
