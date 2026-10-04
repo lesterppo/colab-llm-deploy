@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Logs and local state
+*.log
+tunnel.log
+api_url.txt
+deploy_status.json
+deploy_config.json
+
+# Secrets — never commit
+*token*.json
+*hf_token*
+.env
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
