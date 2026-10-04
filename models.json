@@ -120,6 +120,16 @@
    "params_b": 20,
    "quant": "MXFP4",
    "vram_gb": 14
+  },
+  "mimo-v2.6-9b-q4": {
+   "backend": "ollama",
+   "ctx": 8192,
+   "min_vram_gb": 10,
+   "model_ref": "hf.co/bartowski/MiMo-V2.6-Distill-Qwen-9B-GGUF:Q4_K_M",
+   "notes": "T4-ok. Xiaomi MiMo V2.6 distill of Qwen 9B (~6GB Q4_K_M); Ollama pulls direct from HF via hf.co prefix.",
+   "params_b": 9,
+   "quant": "Q4_K_M",
+   "vram_gb": 7
   }
  }
 }
