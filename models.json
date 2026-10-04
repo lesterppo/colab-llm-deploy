@@ -49,7 +49,9 @@
    "notes": "Default T4 recipe. GGUF via Ollama library; OpenAI-compatible /v1.",
    "params_b": 7,
    "quant": "Q4_K_M",
-   "vram_gb": 6
+   "vram_gb": 6,
+   "proven_t4": true,
+   "proven_date": "2026-10-04"
   },
   "qwen2.5-14b-q4": {
    "backend": "ollama",
@@ -59,7 +61,9 @@
    "notes": "Largest T4-ok recipe (~9GB GGUF Q4_K_M). Needs >=12GB VRAM.",
    "params_b": 14,
    "quant": "Q4_K_M",
-   "vram_gb": 10
+   "vram_gb": 10,
+   "proven_t4": true,
+   "proven_date": "2026-10-04"
   },
   "qwen3.5-9b-q4": {
    "backend": "ollama",
@@ -69,7 +73,9 @@
    "notes": "T4-ok. Qwen3.5 9B, Ollama default quant (Q4_K_M).",
    "params_b": 9,
    "quant": "Q4_K_M",
-   "vram_gb": 7
+   "vram_gb": 7,
+   "proven_t4": true,
+   "proven_date": "2026-10-04"
   },
   "qwen3.5-4b-q4": {
    "backend": "ollama",
@@ -99,7 +105,9 @@
    "notes": "T4-ok. Gemma 4 12B (Mar 2026, Apache 2.0), ~7GB Q4_K_M. Strong all-rounder.",
    "params_b": 12,
    "quant": "Q4_K_M",
-   "vram_gb": 8
+   "vram_gb": 8,
+   "proven_t4": true,
+   "proven_date": "2026-10-04"
   },
   "gemma4-e4b-q4": {
    "backend": "ollama",
@@ -129,7 +137,9 @@
    "notes": "T4-ok. Xiaomi MiMo V2.6 distill of Qwen 9B (~6GB Q4_K_M); Ollama pulls direct from HF via hf.co prefix.",
    "params_b": 9,
    "quant": "Q4_K_M",
-   "vram_gb": 7
+   "vram_gb": 7,
+   "proven_t4": true,
+   "proven_date": "2026-10-04"
   }
  }
 }
