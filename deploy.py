@@ -50,16 +50,36 @@ def load_catalog():
 
 def cmd_deploy(a):
     models = load_catalog()
-    if a.model not in models:
-        raise SystemExit(f"unknown model '{a.model}'. Choices: "
-                         + ", ".join(sorted(models)))
-    recipe = models[a.model]
-    session = a.session or f"llm-{a.model}".replace(".", "-")
-    print(f"Deploying {a.model} ({recipe['model_ref']}, "
-          f"{recipe['backend']}) on {a.gpu} as session '{session}'")
+    auto = (a.model == "auto")
+    session = a.session or (f"llm-auto" if auto
+                            else f"llm-{a.model}".replace(".", "-"))
 
     print("[1/6] Creating session...")
     colab("new", "-s", session, "--gpu", a.gpu, timeout=300)
+
+    if auto:
+        # Hardware adaptation: detect GPU VRAM, pick the largest recipe
+        # whose min_vram_gb fits.
+        out = colab("exec", "-s", session, "--code",
+                    "import subprocess; print(subprocess.run("
+                    "['nvidia-smi','--query-gpu=memory.total',"
+                    "'--format=csv,noheader,nounits'],"
+                    "capture_output=True,text=True).stdout.strip())",
+                    timeout=120)
+        vram = float(out.strip().split()[0]) / 1024
+        fits = [k for k, m in models.items()
+                if m.get("min_vram_gb", 0) <= vram]
+        if not fits:
+            raise SystemExit(f"No recipe fits {vram:.1f}GB VRAM.")
+        a.model = max(fits, key=lambda k: models[k].get("params_b", 0))
+        print(f"  detected {vram:.1f}GB VRAM -> auto-selected '{a.model}'")
+
+    if a.model not in models:
+        raise SystemExit(f"unknown model '{a.model}'. Choices: "
+                         + ", ".join(sorted(models)) + ", or 'auto'")
+    recipe = models[a.model]
+    print(f"Deploying {a.model} ({recipe['model_ref']}, "
+          f"{recipe['backend']}) on {a.gpu} as session '{session}'")
 
     print("[2/6] Uploading driver, catalog, config...")
     colab("upload", "-s", session, DRIVER, "/content/deploy_llm.py")
