@@ -32,7 +32,11 @@ DEPLOY_LOG = "/content/deploy_llm.log"
 OLLAMA_VER = "0.34.4"
 CLOUDFLARED_VER = "2026.9.3"
 VLLM_VER = "0.30.0"
-OLLAMA_BIN = "/content/ollama"
+# Ollama ships as a tarball with a fixed internal layout (bin/ollama +
+# lib/ollama runners). Extract the whole thing to OLLAMA_DIST so the
+# relative layout is preserved; the binary finds its runners next to it.
+OLLAMA_DIST = "/content/ollama-dist"
+OLLAMA_BIN = f"{OLLAMA_DIST}/bin/ollama"
 CLOUDFLARED_BIN = "/content/cloudflared"
 
 cfg = {}
@@ -157,17 +161,38 @@ write_status("tier_check", f"{vram:.1f}GB VRAM, tier ok for {cfg['model']}")
 write_status("install", "installing pinned components")
 print("[1/6] Installing components...", flush=True)
 try:
-    # Ollama binary (pinned)
+    # Ollama binary (pinned). Since ~v0.9 the Linux release asset is
+    # .tar.zst (zstd), NOT .tgz — Colab has no zstd CLI, so decompress
+    # with the `zstandard` pip package + stdlib tarfile.
     need_ollama = backend == "ollama" and not (
         os.path.exists(OLLAMA_BIN) and OLLAMA_VER in
         run([OLLAMA_BIN, "--version"], capture_output=True, text=True, timeout=15).stdout)
     if need_ollama:
         print(f"  Installing ollama {OLLAMA_VER}...", flush=True)
+        run([sys.executable, "-m", "pip", "install", "-q", "zstandard"],
+            timeout=300)
+        import zstandard, tarfile
         url = (f"https://github.com/ollama/ollama/releases/download/v{OLLAMA_VER}/"
-               f"ollama-linux-amd64.tgz")
-        run(["curl", "-sL", "-o", "/tmp/ollama.tgz", url], timeout=300)
-        run(["tar", "xzf", "/tmp/ollama.tgz", "-C", "/tmp"], timeout=60)
-        shutil.move("/tmp/bin/ollama", OLLAMA_BIN)
+               f"ollama-linux-amd64.tar.zst")
+        arc = "/tmp/ollama.tar.zst"
+        # --fail: abort loudly on 404 instead of tar-ing an HTML error page
+        run(["curl", "-sSL", "--fail", "-o", arc, url], timeout=600)
+        with open(arc, "rb") as f:
+            if f.read(4) != b"\x28\xb5\x2f\xfd":
+                die("Ollama download is not zstd-compressed (error page?).")
+        dctx = zstandard.ZstdDecompressor()
+        with open(arc, "rb") as fi, open("/tmp/ollama.tar", "wb") as fo:
+            dctx.copy_stream(fi, fo)
+        if os.path.isdir(OLLAMA_DIST):
+            shutil.rmtree(OLLAMA_DIST)
+        with tarfile.open("/tmp/ollama.tar") as t:
+            t.extractall("/tmp/ollama-x")
+        shutil.move("/tmp/ollama-x/bin", f"{OLLAMA_DIST}/bin")
+        shutil.move("/tmp/ollama-x/lib", f"{OLLAMA_DIST}/lib")
+        shutil.rmtree("/tmp/ollama-x", ignore_errors=True)
+        for p in (arc, "/tmp/ollama.tar"):
+            if os.path.exists(p):
+                os.remove(p)
         os.chmod(OLLAMA_BIN, 0o755)
 
     # cloudflared binary (pinned)
@@ -178,7 +203,7 @@ try:
         print(f"  Installing cloudflared {CLOUDFLARED_VER}...", flush=True)
         url = (f"https://github.com/cloudflare/cloudflared/releases/download/"
                f"{CLOUDFLARED_VER}/cloudflared-linux-amd64")
-        run(["curl", "-sL", "-o", CLOUDFLARED_BIN, url], timeout=120)
+        run(["curl", "-sSL", "--fail", "-o", CLOUDFLARED_BIN, url], timeout=120)
         os.chmod(CLOUDFLARED_BIN, 0o755)
 
     # vLLM (pinned) — only for the vllm backend
@@ -249,16 +274,21 @@ try:
         run([OLLAMA_BIN, "pull", model_ref], timeout=3600, env=env)
         print("  Model pulled.", flush=True)
     else:  # vllm: warm the HF cache now so serve doesn't download cold
+        # HF downloads: hf-xet is the default high-performance backend in
+        # current huggingface_hub; HF_HUB_ENABLE_HF_TRANSFER is
+        # deprecated/ignored (hub>=1.0). Set process-wide so both the
+        # cache warm-up below and any serve-time download (no-token case,
+        # which inherits os.environ) use high-performance Xet.
+        os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
         hf_token = cfg.get("hf_token", "")
         if hf_token:
             print("  Warming HF cache with authenticated download...", flush=True)
-            env = dict(os.environ, HF_HUB_ENABLE_HF_TRANSFER="1")
             code = (
                 "from huggingface_hub import snapshot_download; "
                 f"snapshot_download({model_ref!r}, resume_download=True, "
                 f"token={hf_token!r})"
             )
-            run([sys.executable, "-c", code], timeout=3600, env=env)
+            run([sys.executable, "-c", code], timeout=3600)
             print("  Cache warm.", flush=True)
         else:
             print("  No hf_token: vLLM will download on serve (public repos only).",
