@@ -4,10 +4,14 @@ One-shot LLM deployment on Google Colab GPUs. Give it a GPU session, get back
 an OpenAI-compatible endpoint on a public HTTPS URL — then tear it down when
 you're done.
 
-> **Status: UNTESTED.** The driver is written against the proven
-> hermes-colab-cli primitives and the documented Colab T4 playbook, but the
-> live T4 end-to-end test has not run yet. Do not treat deploys as reliable
-> until that test lands.
+> **Status: live-tested.** End-to-end deploy verified 2026-10-04 on a free
+> Colab T4 (session `llmtest2`): all 6 driver stages clean, Ollama 0.34.4
+> serving `qwen2.5:7b-instruct-q4_K_M` (4.68GB GGUF Q4_K_M), public inference
+> confirmed through the Cloudflare tunnel (`GET /api/version` → 200,
+> `POST /api/generate` "What is 2+2?" → "4" in 3.4s), session stopped after.
+> An earlier run on a different account failed at stage 1 (install) with an
+> unverified cause — likely a transient VM network failure; the current
+> driver is proven working.
 
 ## Architecture
 
