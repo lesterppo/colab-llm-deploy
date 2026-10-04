@@ -47,6 +47,17 @@ egress preflight, health-gated readiness). No code was copied from them.
 
 ## Quickstart
 
+One command does the whole flow (provision → upload → launch → poll →
+tunnel → smoke test):
+
+```bash
+python3 deploy.py deploy --model qwen2.5-7b-q4
+python3 deploy.py status --session llm-qwen2-5-7b-q4
+python3 deploy.py undeploy --session llm-qwen2-5-7b-q4
+```
+
+Manual step-by-step (same thing `deploy.py` automates):
+
 ```bash
 # 1. Provision a T4 (hermes-colab-cli must be installed + authed)
 python3 colab.py new -s llmdeploy --gpu T4
