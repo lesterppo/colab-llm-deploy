@@ -90,6 +90,36 @@
    "params_b": 27,
    "quant": "Q4_K_M",
    "vram_gb": 18
+  },
+  "gemma4-12b-q4": {
+   "backend": "ollama",
+   "ctx": 8192,
+   "min_vram_gb": 10,
+   "model_ref": "gemma4:12b",
+   "notes": "T4-ok. Gemma 4 12B (Mar 2026, Apache 2.0), ~7GB Q4_K_M. Strong all-rounder.",
+   "params_b": 12,
+   "quant": "Q4_K_M",
+   "vram_gb": 8
+  },
+  "gemma4-e4b-q4": {
+   "backend": "ollama",
+   "ctx": 8192,
+   "min_vram_gb": 8,
+   "model_ref": "gemma4:e4b",
+   "notes": "T4-ok, light. Gemma 4 E4B (8B/4.5B eff), ~5GB Q4_K_M.",
+   "params_b": 8,
+   "quant": "Q4_K_M",
+   "vram_gb": 5
+  },
+  "gpt-oss-20b": {
+   "backend": "ollama",
+   "ctx": 8192,
+   "min_vram_gb": 14,
+   "model_ref": "gpt-oss:20b",
+   "notes": "T4-tight. 20B MoE (~14GB MXFP4); most capable per-GB in class. Needs >=14GB VRAM.",
+   "params_b": 20,
+   "quant": "MXFP4",
+   "vram_gb": 14
   }
  }
 }
