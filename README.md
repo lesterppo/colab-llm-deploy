@@ -4,14 +4,18 @@ One-shot LLM deployment on Google Colab GPUs. Give it a GPU session, get back
 an OpenAI-compatible endpoint on a public HTTPS URL — then tear it down when
 you're done.
 
-> **Status: live-tested.** End-to-end deploy verified 2026-10-04 on a free
-> Colab T4 (session `llmtest2`): all 6 driver stages clean, Ollama 0.34.4
-> serving `qwen2.5:7b-instruct-q4_K_M` (4.68GB GGUF Q4_K_M), public inference
-> confirmed through the Cloudflare tunnel (`GET /api/version` → 200,
-> `POST /api/generate` "What is 2+2?" → "4" in 3.4s), session stopped after.
-> An earlier run on a different account failed at stage 1 (install) with an
-> unverified cause — likely a transient VM network failure; the current
-> driver is proven working.
+> **Status: live-tested.** One-command `deploy.py` verified end to end on
+> free Colab T4s (2026-10-04): Qwen2.5-7B, Qwen2.5-14B (via `--model auto`),
+> Gemma 4 12B, Qwen3.5 9B, and MiMo-V2.6 9B (via Ollama `hf.co/` GGUF pull)
+> all deployed, served through Cloudflare tunnels, smoke-tested, and torn
+> down cleanly. See AGENTS.md for the full test matrix and pitfalls.
+
+## For AI agents
+
+**Read [AGENTS.md](AGENTS.md) first** — it has the one-command flow,
+prerequisites, the proven-recipe table, and every pitfall learned live.
+`deploy.py deploy --model <key>` (or `--model auto`) is the entire
+interface; `models.json` keys with `"proven_t4": true` are tested.
 
 ## Architecture
 
