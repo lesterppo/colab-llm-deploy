@@ -25,6 +25,7 @@ Models:
   audio/chatterbox    Chatterbox TTS 0.5B + zero-shot voice cloning
   audio/yue2          YuE2-3B lyrics-to-song
   audio/minimax-music3  MiniMax Music 3, INT8 repack (22GB -> 11.9GB)
+  audio/whisper       Whisper large-v3-turbo speech-to-text
   music/yue2-3b       YuE2-3B lyrics-to-song, ~40s song in ~250s
   music/minimax-music3  MiniMax Music 3 INT8 (11.9GB), ~30s song in ~300s
 
@@ -109,6 +110,15 @@ MEDIA_MODELS = {
         "output_key": "audio",
         "setup_timeout_min": 90, "gen_timeout_min": 90,
         "defaults": {"duration": 30}},
+    "whisper": {
+        "kind": "audio", "dir": "audio/whisper",
+        "setup_script": "setup.py", "gen_script": "gen.py",
+        "extra": [],
+        "setup_status": "/content/stt_setup_status.json",
+        "gen_status": "/content/stt_gen_status.json",
+        "output_key": "txt",
+        "setup_timeout_min": 30, "gen_timeout_min": 15,
+        "defaults": {}},
 }
 
 
@@ -207,6 +217,12 @@ def cmd_generate(a):
         if a.clips:
             cfg["clips"] = a.clips
     cfg.update(spec["defaults"])
+    # Optional input audio upload (whisper STT).
+    if a.audio_file:
+        ext = os.path.splitext(a.audio_file)[1] or ".wav"
+        remote_audio = f"/content/input_audio{ext}"
+        colab("upload", "-s", session, a.audio_file, remote_audio)
+        cfg["audio_path"] = remote_audio
     # CLI values override recipe defaults.
     if a.duration:
         cfg["duration"] = a.duration
@@ -274,7 +290,9 @@ def cmd_status(a):
                  "/content/music3_setup_status.json",
                  "/content/music3_gen_status.json",
                  "/content/tts_setup_status.json",
-                 "/content/tts_gen_status.json"):
+                 "/content/tts_gen_status.json",
+                 "/content/stt_setup_status.json",
+                 "/content/stt_gen_status.json"):
         try:
             s = read_status(a.session, path)
             print(f"{path}: stage={s.get('stage')} ready={s.get('ready')}")
@@ -303,7 +321,7 @@ def main():
     g.add_argument("--kind", choices=["image", "video", "audio"], required=True)
     g.add_argument("--model", required=True,
                    help=("flux2-klein | hidream-i1 | ltx23 | ltx23-chain | "
-                         "chatterbox | yue2 | minimax-music3"))
+                         "chatterbox | yue2 | minimax-music3 | whisper"))
     g.add_argument("--prompt",
                    help="image/video prompt (required for those kinds)")
     g.add_argument("--negative")
@@ -317,6 +335,8 @@ def main():
                    help="audio: song length in seconds (minimax-music3)")
     g.add_argument("--max-seconds", type=int,
                    help="audio: song length in seconds (yue2)")
+    g.add_argument("--audio-file",
+                   help="audio: local audio file to upload (whisper STT)")
     g.add_argument("--seed", type=int)
     g.add_argument("--width", type=int)
     g.add_argument("--height", type=int)
