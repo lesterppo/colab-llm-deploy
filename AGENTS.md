@@ -12,20 +12,23 @@ python3 deploy.py deploy --model <catalog-key> [--gpu T4] [--session NAME]
 python3 deploy.py status --session NAME
 python3 deploy.py undeploy --session NAME        # kills procs + stops session
 
-# Image / video -> local file
+# Image / video / music -> local file
 python3 deploy_media.py generate --kind image --model flux2-klein --prompt "..." [--out DIR]
 python3 deploy_media.py generate --kind video --model ltx23 --prompt "..." [--out DIR]
+python3 deploy_media.py generate --kind music --model yue2-3b --lyrics "..." [--out DIR]
 python3 deploy_media.py status   --session NAME
 python3 deploy_media.py undeploy --session NAME
 ```
 
 `deploy.py --model auto` detects GPU VRAM via nvidia-smi and picks the
 largest fitting recipe. `deploy_media.py --model` picks the pipeline:
-`flux2-klein | hidream-i1 | ltx23 | ltx23-chain`; prompts and sizes go
+`flux2-klein | hidream-i1 | ltx23 | ltx23-chain | yue2-3b | minimax-music3`;
+prompts, sizes, and lyrics go
 through `/content/gen_config.json` so gen scripts never guess.
 
 Modality guides: [image/README.md](image/README.md),
-[video/README.md](video/README.md). LLM details below.
+[video/README.md](video/README.md),
+[music/README.md](music/README.md). LLM details below.
 
 ## Prerequisites
 
@@ -97,7 +100,7 @@ deepseek-coder-6.7b-q4, llama3.1-8b-q4.
     things (and Colab's preinstalled deps conflict with tight pins — the
     driver avoids over-pinning).
 
-## Media pitfalls (image/video, learned live 2026-10-04/05)
+## Media pitfalls (image/video/music, learned live 2026-10-04/05)
 
 1. **ComfyUI must be >= 0.38** for the `flux2` CLIPLoader type (FLUX.2
    klein); older tags 400 the workflow.
@@ -118,6 +121,18 @@ deepseek-coder-6.7b-q4, llama3.1-8b-q4.
    files are written at every stage); a 5-clip chain takes ~38 min —
    well inside session lifetimes, but don't run it in a foreground
    `exec` with a short timeout.
+8. **Music lyrics must reach the VM as a file.** `deploy_media.py` writes
+   them into `/content/gen_config.json` — never paste multi-line lyrics
+   through `exec --code` (shell quoting breaks). Both music `gen.py`
+   scripts reproduce the tested lighthouse song from built-in defaults
+   when no `--lyrics` is given.
+9. **MiniMax Music 3 INT8 repack**: 22GB → 11.9GB (DiT 2.5GB + pruned
+   INT8 text encoder 9.2GB + DAV VAE). Probe `SaveAudioAdvanced` and
+   fall back to core `SaveAudio` on older ComfyUI builds.
+10. **YuE2 on T4**: ~7.25GB weights, no quantization needed; T4 has no
+    BF16 so the acoustic stage runs slower than on A100-class GPUs. The
+    pack reads weights in the `original` layout (`models/YuE2/YuE2-3B/`,
+    `models/YuE2/YuE2-Vae`) — download with `--local-dir` directly there.
 
 ## Teardown discipline
 
