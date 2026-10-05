@@ -1,145 +1,157 @@
 {
- "_comment": "Model recipe catalog for colab-llm-deploy. The orchestrator uploads this to /content/models.json; deploy_llm.py resolves config['model'] against it. vram_gb = steady-state estimate incl. context; min_vram_gb = hard tier gate.",
- "models": {
-  "deepseek-coder-6.7b-q4": {
-   "backend": "ollama",
-   "ctx": 16384,
-   "min_vram_gb": 8,
-   "model_ref": "deepseek-coder:6.7b-instruct",
-   "notes": "T4-ok. Code specialist; Ollama default quant is Q4_K_M.",
-   "params_b": 6.7,
-   "quant": "Q4_K_M",
-   "vram_gb": 5.5
-  },
-  "llama3.1-8b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 10,
-   "model_ref": "llama3.1:8b-instruct-q4_K_M",
-   "notes": "T4-ok. GGUF via Ollama library.",
-   "params_b": 8,
-   "quant": "Q4_K_M",
-   "vram_gb": 7
-  },
-  "phi4-14b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 24,
-   "model_ref": "phi4:14b",
-   "notes": "Needs >=24GB (L4/A10G tier), NOT a T4 recipe. Ollama library tag; default quant Q4_K_M. (No verified AWQ/FP8 Hub repo for Phi-4 was available, so this ships on Ollama rather than vLLM.)",
-   "params_b": 14,
-   "quant": "Q4_K_M",
-   "vram_gb": 12
-  },
-  "qwen2.5-7b-awq": {
-   "backend": "vllm",
-   "ctx": 4096,
-   "min_vram_gb": 12,
-   "model_ref": "Qwen/Qwen2.5-7B-Instruct-AWQ",
-   "notes": "T4-tight but workable (gpu-memory-utilization 0.90, ctx capped at 4096 on <30GB). A100-preferred for headroom. Pass hf_token in config for reliable Hub download.",
-   "params_b": 7,
-   "quant": "AWQ",
-   "vram_gb": 9
-  },
-  "qwen2.5-7b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 10,
-   "model_ref": "qwen2.5:7b-instruct-q4_K_M",
-   "notes": "Default T4 recipe. GGUF via Ollama library; OpenAI-compatible /v1.",
-   "params_b": 7,
-   "quant": "Q4_K_M",
-   "vram_gb": 6,
-   "proven_t4": true,
-   "proven_date": "2026-10-04"
-  },
-  "qwen2.5-14b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 12,
-   "model_ref": "qwen2.5:14b-instruct-q4_K_M",
-   "notes": "Largest T4-ok recipe (~9GB GGUF Q4_K_M). Needs >=12GB VRAM.",
-   "params_b": 14,
-   "quant": "Q4_K_M",
-   "vram_gb": 10,
-   "proven_t4": true,
-   "proven_date": "2026-10-04"
-  },
-  "qwen3.5-9b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 10,
-   "model_ref": "qwen3.5:9b",
-   "notes": "T4-ok. Qwen3.5 9B, Ollama default quant (Q4_K_M).",
-   "params_b": 9,
-   "quant": "Q4_K_M",
-   "vram_gb": 7,
-   "proven_t4": true,
-   "proven_date": "2026-10-04"
-  },
-  "qwen3.5-4b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 8,
-   "model_ref": "qwen3.5:4b",
-   "notes": "T4-ok, light. Qwen3.5 4B, Ollama default quant (Q4_K_M).",
-   "params_b": 4,
-   "quant": "Q4_K_M",
-   "vram_gb": 4
-  },
-  "qwen3.5-27b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 24,
-   "model_ref": "qwen3.5:27b-q4_",
-   "notes": "Needs >=24GB (L4/A10G tier), NOT a T4 recipe.",
-   "params_b": 27,
-   "quant": "Q4_K_M",
-   "vram_gb": 18
-  },
-  "gemma4-12b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 10,
-   "model_ref": "gemma4:12b",
-   "notes": "T4-ok. Gemma 4 12B (Mar 2026, Apache 2.0), ~7GB Q4_K_M. Strong all-rounder.",
-   "params_b": 12,
-   "quant": "Q4_K_M",
-   "vram_gb": 8,
-   "proven_t4": true,
-   "proven_date": "2026-10-04"
-  },
-  "gemma4-e4b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 8,
-   "model_ref": "gemma4:e4b",
-   "notes": "T4-ok, light. Gemma 4 E4B (8B/4.5B eff), ~5GB Q4_K_M.",
-   "params_b": 8,
-   "quant": "Q4_K_M",
-   "vram_gb": 5
-  },
-  "gpt-oss-20b": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 14,
-   "model_ref": "gpt-oss:20b",
-   "notes": "T4-tight. 20B MoE (~14GB MXFP4); most capable per-GB in class. Needs >=14GB VRAM.",
-   "params_b": 20,
-   "quant": "MXFP4",
-   "vram_gb": 14
-  },
-  "mimo-v2.6-9b-q4": {
-   "backend": "ollama",
-   "ctx": 8192,
-   "min_vram_gb": 10,
-   "model_ref": "hf.co/bartowski/MiMo-V2.6-Distill-Qwen-9B-GGUF:Q4_K_M",
-   "notes": "T4-ok. Xiaomi MiMo V2.6 distill of Qwen 9B (~6GB Q4_K_M); Ollama pulls direct from HF via hf.co prefix.",
-   "params_b": 9,
-   "quant": "Q4_K_M",
-   "vram_gb": 7,
-   "proven_t4": true,
-   "proven_date": "2026-10-04"
+  "_comment": "Model recipe catalog for colab-llm-deploy. The orchestrator uploads this to /content/models.json; deploy_llm.py resolves config['model'] against it. vram_gb = steady-state estimate incl. context; min_vram_gb = hard tier gate.",
+  "models": {
+    "deepseek-coder-6.7b-q4": {
+      "backend": "ollama",
+      "ctx": 16384,
+      "min_vram_gb": 8,
+      "model_ref": "deepseek-coder:6.7b-instruct",
+      "notes": "T4-ok. Code specialist; Ollama default quant is Q4_K_M.",
+      "params_b": 6.7,
+      "quant": "Q4_K_M",
+      "vram_gb": 5.5
+    },
+    "llama3.1-8b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 10,
+      "model_ref": "llama3.1:8b-instruct-q4_K_M",
+      "notes": "T4-ok. GGUF via Ollama library.",
+      "params_b": 8,
+      "quant": "Q4_K_M",
+      "vram_gb": 7
+    },
+    "phi4-14b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 24,
+      "model_ref": "phi4:14b",
+      "notes": "Needs >=24GB (L4/A10G tier), NOT a T4 recipe. Ollama library tag; default quant Q4_K_M. (No verified AWQ/FP8 Hub repo for Phi-4 was available, so this ships on Ollama rather than vLLM.)",
+      "params_b": 14,
+      "quant": "Q4_K_M",
+      "vram_gb": 12
+    },
+    "qwen2.5-7b-awq": {
+      "backend": "vllm",
+      "ctx": 4096,
+      "min_vram_gb": 12,
+      "model_ref": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+      "notes": "T4-tight but workable (gpu-memory-utilization 0.90, ctx capped at 4096 on <30GB). A100-preferred for headroom. Pass hf_token in config for reliable Hub download.",
+      "params_b": 7,
+      "quant": "AWQ",
+      "vram_gb": 9
+    },
+    "qwen2.5-7b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 10,
+      "model_ref": "qwen2.5:7b-instruct-q4_K_M",
+      "notes": "Default T4 recipe. GGUF via Ollama library; OpenAI-compatible /v1.",
+      "params_b": 7,
+      "quant": "Q4_K_M",
+      "vram_gb": 6,
+      "proven_t4": true,
+      "proven_date": "2026-10-04"
+    },
+    "qwen2.5-14b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 12,
+      "model_ref": "qwen2.5:14b-instruct-q4_K_M",
+      "notes": "Largest T4-ok recipe (~9GB GGUF Q4_K_M). Needs >=12GB VRAM.",
+      "params_b": 14,
+      "quant": "Q4_K_M",
+      "vram_gb": 10,
+      "proven_t4": true,
+      "proven_date": "2026-10-04"
+    },
+    "qwen3.5-9b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 10,
+      "model_ref": "qwen3.5:9b",
+      "notes": "T4-ok. Qwen3.5 9B, Ollama default quant (Q4_K_M).",
+      "params_b": 9,
+      "quant": "Q4_K_M",
+      "vram_gb": 7,
+      "proven_t4": true,
+      "proven_date": "2026-10-04"
+    },
+    "qwen3.5-4b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 8,
+      "model_ref": "qwen3.5:4b",
+      "notes": "T4-ok, light. Qwen3.5 4B, Ollama default quant (Q4_K_M).",
+      "params_b": 4,
+      "quant": "Q4_K_M",
+      "vram_gb": 4
+    },
+    "qwen3.5-27b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 24,
+      "model_ref": "qwen3.5:27b-q4_",
+      "notes": "Needs >=24GB (L4/A10G tier), NOT a T4 recipe.",
+      "params_b": 27,
+      "quant": "Q4_K_M",
+      "vram_gb": 18
+    },
+    "gemma4-12b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 10,
+      "model_ref": "gemma4:12b",
+      "notes": "T4-ok. Gemma 4 12B (Mar 2026, Apache 2.0), ~7GB Q4_K_M. Strong all-rounder.",
+      "params_b": 12,
+      "quant": "Q4_K_M",
+      "vram_gb": 8,
+      "proven_t4": true,
+      "proven_date": "2026-10-04"
+    },
+    "gemma4-e4b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 8,
+      "model_ref": "gemma4:e4b",
+      "notes": "T4-ok, light. Gemma 4 E4B (8B/4.5B eff), ~5GB Q4_K_M.",
+      "params_b": 8,
+      "quant": "Q4_K_M",
+      "vram_gb": 5
+    },
+    "gpt-oss-20b": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 14,
+      "model_ref": "gpt-oss:20b",
+      "notes": "T4-tight. 20B MoE (~14GB MXFP4); most capable per-GB in class. Needs >=14GB VRAM.",
+      "params_b": 20,
+      "quant": "MXFP4",
+      "vram_gb": 14
+    },
+    "mimo-v2.6-9b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 10,
+      "model_ref": "hf.co/bartowski/MiMo-V2.6-Distill-Qwen-9B-GGUF:Q4_K_M",
+      "notes": "T4-ok. Xiaomi MiMo V2.6 distill of Qwen 9B (~6GB Q4_K_M); Ollama pulls direct from HF via hf.co prefix.",
+      "params_b": 9,
+      "quant": "Q4_K_M",
+      "vram_gb": 7,
+      "proven_t4": true,
+      "proven_date": "2026-10-04"
+    },
+    "clef-flash-9b": {
+      "backend": "ollama",
+      "ctx": 262144,
+      "min_vram_gb": 12,
+      "model_ref": "clef-flash:latest",
+      "notes": "Cloudflare Workers AI 9B decision model (Apache 2.0); typed decisions via POST /v1/systemone (needs Ollama >= 0.35). Official tag 11-12GB, NOT the smallest recipe. Request shape: {\"model\": <tag>, \"state\": \"...\", \"questions\": {\"<name>\": {\"type\": \"noul\"|\"choice\"|\"score\", \"instructions\": \"...\", \"criteria\": {\"<candidate>\": \"<description>\", ... (2-26, choice only)}}}}. Response: {\"answers\": {\"<name>\": {\"type\": ..., \"noul\": p | \"choice\": \"<c>\", \"probabilities\": {...}, \"confidence\": c}}}. NOTE: /api/generate is not meaningful for this model; use /v1/systemone.",
+      "params_b": 9,
+      "quant": "ollama-default",
+      "vram_gb": 11,
+      "proven_t4": true,
+      "proven_date": "2026-10-05"
+    }
   }
- }
 }
