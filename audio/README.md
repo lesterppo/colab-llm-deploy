@@ -9,16 +9,29 @@ VRAM). Each model dir is self-contained: `setup.py` (VM-side, stage-gated)
 ```bash
 # From the repo root:
 python3 deploy_media.py generate --kind audio --model chatterbox \
-    --config-json '{"text1": "The lighthouse stands above the waves.", "text2": "Shine on through the night."}' \
+    --text1 "The lighthouse stands above the waves." \
+    --text2 "Shine on through the night." \
     --out ./outputs
 
 python3 deploy_media.py generate --kind audio --model yue2 \
-    --config-json '{"style": "cinematic folk, warm male vocal, 90 bpm", "lyrics": "[Verse]\nGolden light on the water\n[Chorus]\nShine on", "max_seconds": 40}' \
+    --style "cinematic folk, warm male vocal, 90 bpm" \
+    --lyrics "[Verse]
+Golden light on the water
+[Chorus]
+Shine on" \
+    --max-seconds 40 \
     --out ./outputs
 
 python3 deploy_media.py generate --kind audio --model minimax-music3 \
-    --config-json '{"caption": "cinematic folk, warm male vocal", "lyrics": "[verse] Golden light\n[chorus] Shine on", "duration": 30}' \
+    --caption "cinematic folk, warm male vocal" \
+    --lyrics "[verse] Golden light
+[chorus] Shine on" \
+    --duration 30 \
     --out ./outputs
+
+# Speech-to-text:
+python3 deploy_media.py generate --kind audio --model whisper \
+    --audio-file ./speech.wav --out ./outputs
 ```
 
 `deploy_media.py` does everything: session → upload → detached setup →
@@ -53,3 +66,9 @@ poll → detached gen → poll → download → stop session.
 - Proven (2026-10-05, T4): 30s song in 301s, peak VRAM 11.9GB.
 - Pitfall: upload the config as a file — multi-line lyrics break when
   passed through `exec --code` (shell newline handling).
+
+### whisper — Whisper large-v3-turbo STT (verify license for non-test use)
+- 809M params, fp16, ~1.9GB VRAM — the lightest deployment in the series.
+  gen_config: `audio_path` (uploaded via `--audio-file`), `out_name`.
+- Proven (2026-10-05, T4): 18/18 words correct transcribing Chatterbox
+  output, 3.7s for 5.1s of audio.
