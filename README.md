@@ -9,6 +9,7 @@ generated video — then tear it down when you're done.
 | LLM | `python3 deploy.py deploy --model auto` | Serves an Ollama/vLLM model behind a public Cloudflare-tunnel URL |
 | Image | `python3 deploy_media.py generate --kind image --model flux2-klein --prompt "..."` | Text-to-image PNG (FLUX.2-klein-4B, HiDream-I1 17B) |
 | Video | `python3 deploy_media.py generate --kind video --model ltx23 --prompt "..."` | Text-to-video MP4 (LTX-2.3 22B); `--model ltx23-chain` for longer chained videos |
+| Music | `python3 deploy_media.py generate --kind music --model yue2-3b --lyrics "..."` | Lyrics-to-song audio (YuE2-3B, MiniMax Music 3 INT8) |
 
 > **Status: live-tested on free Colab T4s.**
 > LLMs (2026-10-04): Qwen2.5-7B/14B, Gemma 4 12B, Qwen3.5 9B, MiMo-V2.6 9B —
