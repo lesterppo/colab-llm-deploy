@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-shot image/video generation orchestrator (host side).
+"""One-shot image/video/music generation orchestrator (host side).
 
 Drives lesterppo/hermes-colab-cli end to end:
   new -> upload setup+gen scripts+config -> exec_detach setup ->
@@ -8,8 +8,12 @@ Drives lesterppo/hermes-colab-cli end to end:
 Usage:
   deploy_media.py generate --kind image --model flux2-klein --prompt "..."
       [--negative "..."] [--seed 42] [--width 1024] [--height 1024]
-      [--steps 4] [--frames 49] [--fps 24] [--clips 5]
-      [--gpu T4] [--session NAME] [--out DIR] [--keep]
+      [--steps 4] [--out DIR] [--keep]
+  deploy_media.py generate --kind video --model ltx23 --prompt "..."
+      [--frames 49] [--fps 24] [--steps 8] [--out DIR] [--keep]
+  deploy_media.py generate --kind music --model yue2-3b
+      --lyrics "[Verse] ..." --style "..." [--max-seconds 40]
+      [--out DIR] [--keep]
   deploy_media.py status   --session NAME
   deploy_media.py undeploy --session NAME
 
@@ -18,8 +22,12 @@ Models:
   image/hidream-i1    HiDream-I1 17B (Q4_K_M GGUF), 1024px, 24 steps
   video/ltx23         LTX-2.3 22B distilled (Q3_K_M GGUF), 576x320 49f, ~7min
   video/ltx23-chain   LTX-2.3 chained clips (first-frame conditioning)
+  music/yue2-3b       YuE2-3B lyrics-to-song, ~40s song in ~250s
+  music/minimax-music3  MiniMax Music 3 INT8 (11.9GB), ~30s song in ~300s
 
 gen_config.json is written to the VM so gen scripts never guess the prompt.
+For music, lyrics/style/caption go through the same config file (never
+pasted through exec --code — multi-line lyrics break there).
 """
 import argparse
 import json
@@ -71,6 +79,24 @@ MEDIA_MODELS = {
         "setup_timeout_min": 90, "gen_timeout_min": 180,
         "defaults": {"width": 576, "height": 320, "frames": 49,
                      "fps": 24, "steps": 8, "clips": 5}},
+    "yue2-3b": {
+        "kind": "music", "dir": "music/yue2-3b",
+        "setup_script": "setup.py", "gen_script": "gen.py",
+        "extra": [],
+        "setup_status": "/content/yue2_setup_status.json",
+        "gen_status": "/content/yue2_gen_status.json",
+        "output_key": "audio",
+        "setup_timeout_min": 90, "gen_timeout_min": 90,
+        "defaults": {"max_seconds": 40}},
+    "minimax-music3": {
+        "kind": "music", "dir": "music/minimax-music3",
+        "setup_script": "setup.py", "gen_script": "gen.py",
+        "extra": [],
+        "setup_status": "/content/music3_setup_status.json",
+        "gen_status": "/content/music3_gen_status.json",
+        "output_key": "audio",
+        "setup_timeout_min": 90, "gen_timeout_min": 90,
+        "defaults": {"duration": 30}},
 }
 
 
@@ -138,24 +164,42 @@ def cmd_generate(a):
     for extra in spec["extra"]:
         colab("upload", "-s", session, os.path.join(model_dir, extra),
               f"/content/{extra}")
-    cfg = {"prompt": a.prompt}
-    if a.negative:
-        cfg["negative"] = a.negative
+    cfg = {}
+    if spec["kind"] == "music":
+        # lyrics/style travel through gen_config.json — never exec --code
+        # (multi-line lyrics break shell quoting).
+        if a.lyrics:
+            cfg["lyrics"] = a.lyrics
+        if a.style:
+            cfg["style"] = a.style
+        if a.caption:
+            cfg["caption"] = a.caption
+    else:
+        if not a.prompt:
+            raise SystemExit("--prompt is required for image/video")
+        cfg["prompt"] = a.prompt
+        if a.negative:
+            cfg["negative"] = a.negative
+        if a.width:
+            cfg["width"] = a.width
+        if a.height:
+            cfg["height"] = a.height
+        if a.frames:
+            cfg["frames"] = a.frames
+        if a.fps:
+            cfg["fps"] = a.fps
+        if a.clips:
+            cfg["clips"] = a.clips
     cfg.update(spec["defaults"])
-    if a.seed is not None:
-        cfg["seed"] = a.seed
-    if a.width:
-        cfg["width"] = a.width
-    if a.height:
-        cfg["height"] = a.height
+    # CLI values override recipe defaults.
+    if a.duration:
+        cfg["duration"] = a.duration
+    if a.max_seconds:
+        cfg["max_seconds"] = a.max_seconds
     if a.steps:
         cfg["steps"] = a.steps
-    if a.frames:
-        cfg["frames"] = a.frames
-    if a.fps:
-        cfg["fps"] = a.fps
-    if a.clips:
-        cfg["clips"] = a.clips
+    if a.seed is not None:
+        cfg["seed"] = a.seed
     cfg["out_name"] = f"{a.model.replace('-', '_')}_out"
     colab("exec", "-s", session, "--code",
           f"open('/content/gen_config.json','w').write({json.dumps(cfg)!r})")
@@ -177,10 +221,14 @@ def cmd_generate(a):
     if not remote:
         raise SystemExit(f"No {spec['output_key']} in gen status: "
                          f"{json.dumps(status)[:500]}")
-    ext = ".mp4" if spec["kind"] == "video" else ".png"
-    local = os.path.join(out_dir, os.path.basename(remote))
-    if not local.endswith(ext):
-        local += ext
+    if spec["kind"] == "music":
+        # gen status carries the real audio path with its extension
+        local = os.path.join(out_dir, os.path.basename(remote))
+    else:
+        ext = ".mp4" if spec["kind"] == "video" else ".png"
+        local = os.path.join(out_dir, os.path.basename(remote))
+        if not local.endswith(ext):
+            local += ext
     colab("download", "-s", session, remote, local, timeout=600)
     print(f"  saved: {local} ({os.path.getsize(local)} bytes)")
 
@@ -197,7 +245,11 @@ def cmd_status(a):
                  "/content/ltx23_chain_status.json",
                  "/content/comfy_setup_status.json",
                  "/content/hidream_setup_status.json",
-                 "/content/ltx23_setup_status.json"):
+                 "/content/ltx23_setup_status.json",
+                 "/content/yue2_setup_status.json",
+                 "/content/yue2_gen_status.json",
+                 "/content/music3_setup_status.json",
+                 "/content/music3_gen_status.json"):
         try:
             s = read_status(a.session, path)
             print(f"{path}: stage={s.get('stage')} ready={s.get('ready')}")
@@ -223,11 +275,20 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
 
     g = sub.add_parser("generate")
-    g.add_argument("--kind", choices=["image", "video"], required=True)
+    g.add_argument("--kind", choices=["image", "video", "music"], required=True)
     g.add_argument("--model", required=True,
-                   help="flux2-klein | hidream-i1 | ltx23 | ltx23-chain")
-    g.add_argument("--prompt", required=True)
+                   help=("flux2-klein | hidream-i1 | ltx23 | ltx23-chain | "
+                         "yue2-3b | minimax-music3"))
+    g.add_argument("--prompt",
+                   help="image/video prompt (required for those kinds)")
     g.add_argument("--negative")
+    g.add_argument("--lyrics", help="music: song lyrics (multi-line OK)")
+    g.add_argument("--style", help="music: yue2-3b style description")
+    g.add_argument("--caption", help="music: minimax-music3 caption")
+    g.add_argument("--duration", type=int,
+                   help="music: song length in seconds (minimax-music3)")
+    g.add_argument("--max-seconds", type=int,
+                   help="music: song length in seconds (yue2-3b)")
     g.add_argument("--seed", type=int)
     g.add_argument("--width", type=int)
     g.add_argument("--height", type=int)
