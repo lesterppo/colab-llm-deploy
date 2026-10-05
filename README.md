@@ -9,6 +9,7 @@ generated video — then tear it down when you're done.
 | LLM | `python3 deploy.py deploy --model auto` | Serves an Ollama/vLLM model behind a public Cloudflare-tunnel URL |
 | Image | `python3 deploy_media.py generate --kind image --model flux2-klein --prompt "..."` | Text-to-image PNG (FLUX.2-klein-4B, HiDream-I1 17B) |
 | Video | `python3 deploy_media.py generate --kind video --model ltx23 --prompt "..."` | Text-to-video MP4 (LTX-2.3 22B); `--model ltx23-chain` for longer chained videos |
+| Audio | `python3 deploy_media.py generate --kind audio --model chatterbox --text1 "..."` | TTS + voice cloning (Chatterbox), lyrics-to-song (YuE2-3B, MiniMax Music 3) |
 | Music | `python3 deploy_media.py generate --kind music --model yue2-3b --lyrics "..."` | Lyrics-to-song audio (YuE2-3B, MiniMax Music 3 INT8) |
 
 > **Status: live-tested on free Colab T4s.**
@@ -17,8 +18,11 @@ generated video — then tear it down when you're done.
 > Images (2026-10-04/05): FLUX.2-klein-4B (~70s per 1024px image),
 > HiDream-I1 17B Q4 (tight but workable).
 > Video (2026-10-05): LTX-2.3 22B Q3 (576x320 49f in ~7 min; 5-clip chain =
-> ~10.2s in ~38 min). See [AGENTS.md](AGENTS.md), [image/](image/),
-> [video/](video/) for the full test matrix and pitfalls.
+> ~10.2s in ~38 min).
+> Audio (2026-10-05): Chatterbox TTS + zero-shot voice cloning, YuE2-3B
+> lyrics-to-song (40s in ~4 min), MiniMax Music 3 INT8 repack (30s in ~5 min).
+> See [AGENTS.md](AGENTS.md), [image/](image/), [video/](video/),
+> [audio/](audio/) for the full test matrix and pitfalls.
 
 ## Architecture
 
