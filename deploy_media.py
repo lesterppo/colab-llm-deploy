@@ -22,6 +22,9 @@ Models:
   image/hidream-i1    HiDream-I1 17B (Q4_K_M GGUF), 1024px, 24 steps
   video/ltx23         LTX-2.3 22B distilled (Q3_K_M GGUF), 576x320 49f, ~7min
   video/ltx23-chain   LTX-2.3 chained clips (first-frame conditioning)
+  audio/chatterbox    Chatterbox TTS 0.5B + zero-shot voice cloning
+  audio/yue2          YuE2-3B lyrics-to-song
+  audio/minimax-music3  MiniMax Music 3, INT8 repack (22GB -> 11.9GB)
   music/yue2-3b       YuE2-3B lyrics-to-song, ~40s song in ~250s
   music/minimax-music3  MiniMax Music 3 INT8 (11.9GB), ~30s song in ~300s
 
@@ -79,17 +82,26 @@ MEDIA_MODELS = {
         "setup_timeout_min": 90, "gen_timeout_min": 180,
         "defaults": {"width": 576, "height": 320, "frames": 49,
                      "fps": 24, "steps": 8, "clips": 5}},
-    "yue2-3b": {
-        "kind": "music", "dir": "music/yue2-3b",
+    "chatterbox": {
+        "kind": "audio", "dir": "audio/chatterbox",
+        "setup_script": "setup.py", "gen_script": "gen.py",
+        "extra": [],
+        "setup_status": "/content/tts_setup_status.json",
+        "gen_status": "/content/tts_gen_status.json",
+        "output_keys": ["wav1", "wav2"],
+        "setup_timeout_min": 45, "gen_timeout_min": 30,
+        "defaults": {}},
+    "yue2": {
+        "kind": "audio", "dir": "audio/yue2",
         "setup_script": "setup.py", "gen_script": "gen.py",
         "extra": [],
         "setup_status": "/content/yue2_setup_status.json",
         "gen_status": "/content/yue2_gen_status.json",
         "output_key": "audio",
-        "setup_timeout_min": 90, "gen_timeout_min": 90,
+        "setup_timeout_min": 60, "gen_timeout_min": 120,
         "defaults": {"max_seconds": 40}},
     "minimax-music3": {
-        "kind": "music", "dir": "music/minimax-music3",
+        "kind": "audio", "dir": "audio/minimax-music3",
         "setup_script": "setup.py", "gen_script": "gen.py",
         "extra": [],
         "setup_status": "/content/music3_setup_status.json",
@@ -165,15 +177,19 @@ def cmd_generate(a):
         colab("upload", "-s", session, os.path.join(model_dir, extra),
               f"/content/{extra}")
     cfg = {}
-    if spec["kind"] == "music":
-        # lyrics/style travel through gen_config.json — never exec --code
-        # (multi-line lyrics break shell quoting).
+    if spec["kind"] == "audio":
+        # lyrics/style/text travel through gen_config.json — never exec --code
+        # (multi-line text breaks shell quoting).
         if a.lyrics:
             cfg["lyrics"] = a.lyrics
         if a.style:
             cfg["style"] = a.style
         if a.caption:
             cfg["caption"] = a.caption
+        if a.text1:
+            cfg["text1"] = a.text1
+        if a.text2:
+            cfg["text2"] = a.text2
     else:
         if not a.prompt:
             raise SystemExit("--prompt is required for image/video")
@@ -217,27 +233,34 @@ def cmd_generate(a):
                          "gen")
 
     print("[5/6] Downloading output...")
-    remote = status.get(spec["output_key"])
-    if not remote:
-        raise SystemExit(f"No {spec['output_key']} in gen status: "
-                         f"{json.dumps(status)[:500]}")
-    if spec["kind"] == "music":
-        # gen status carries the real audio path with its extension
-        local = os.path.join(out_dir, os.path.basename(remote))
-    else:
-        ext = ".mp4" if spec["kind"] == "video" else ".png"
-        local = os.path.join(out_dir, os.path.basename(remote))
-        if not local.endswith(ext):
-            local += ext
-    colab("download", "-s", session, remote, local, timeout=600)
-    print(f"  saved: {local} ({os.path.getsize(local)} bytes)")
+    output_keys = spec.get("output_keys") or [spec["output_key"]]
+    locals_ = []
+    for key in output_keys:
+        remote = status.get(key)
+        if not remote:
+            if len(output_keys) == 1:
+                raise SystemExit(f"No {key} in gen status: "
+                                 f"{json.dumps(status)[:500]}")
+            print(f"  (no {key} in status, skipping)")
+            continue
+        if spec["kind"] == "audio":
+            # gen status carries the real audio path with its extension
+            local = os.path.join(out_dir, os.path.basename(remote))
+        else:
+            ext = ".mp4" if spec["kind"] == "video" else ".png"
+            local = os.path.join(out_dir, os.path.basename(remote))
+            if not local.endswith(ext):
+                local += ext
+        colab("download", "-s", session, remote, local, timeout=600)
+        print(f"  saved: {local} ({os.path.getsize(local)} bytes)")
+        locals_.append(local)
 
     if not a.keep:
         print("[6/6] Stopping session (billing halted)...")
         colab("stop", "-s", session, timeout=120)
     else:
         print(f"[6/6] Session '{session}' kept alive (--keep).")
-    print(f"\nDONE. Output: {local}")
+    print(f"\nDONE. Outputs: {', '.join(locals_)}")
 
 
 def cmd_status(a):
@@ -249,7 +272,9 @@ def cmd_status(a):
                  "/content/yue2_setup_status.json",
                  "/content/yue2_gen_status.json",
                  "/content/music3_setup_status.json",
-                 "/content/music3_gen_status.json"):
+                 "/content/music3_gen_status.json",
+                 "/content/tts_setup_status.json",
+                 "/content/tts_gen_status.json"):
         try:
             s = read_status(a.session, path)
             print(f"{path}: stage={s.get('stage')} ready={s.get('ready')}")
@@ -275,20 +300,23 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
 
     g = sub.add_parser("generate")
-    g.add_argument("--kind", choices=["image", "video", "music"], required=True)
+    g.add_argument("--kind", choices=["image", "video", "audio"], required=True)
     g.add_argument("--model", required=True,
                    help=("flux2-klein | hidream-i1 | ltx23 | ltx23-chain | "
-                         "yue2-3b | minimax-music3"))
+                         "chatterbox | yue2 | minimax-music3"))
     g.add_argument("--prompt",
                    help="image/video prompt (required for those kinds)")
     g.add_argument("--negative")
-    g.add_argument("--lyrics", help="music: song lyrics (multi-line OK)")
-    g.add_argument("--style", help="music: yue2-3b style description")
-    g.add_argument("--caption", help="music: minimax-music3 caption")
+    g.add_argument("--lyrics", help="audio: song lyrics (multi-line OK)")
+    g.add_argument("--style", help="audio: yue2 style description")
+    g.add_argument("--caption", help="audio: minimax-music3 caption")
+    g.add_argument("--text1", help="audio: chatterbox paragraph 1")
+    g.add_argument("--text2",
+                   help="audio: chatterbox paragraph 2 (voice-cloned)")
     g.add_argument("--duration", type=int,
-                   help="music: song length in seconds (minimax-music3)")
+                   help="audio: song length in seconds (minimax-music3)")
     g.add_argument("--max-seconds", type=int,
-                   help="music: song length in seconds (yue2-3b)")
+                   help="audio: song length in seconds (yue2)")
     g.add_argument("--seed", type=int)
     g.add_argument("--width", type=int)
     g.add_argument("--height", type=int)
