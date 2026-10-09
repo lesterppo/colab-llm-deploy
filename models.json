@@ -152,6 +152,18 @@
       "vram_gb": 11,
       "proven_t4": true,
       "proven_date": "2026-10-05"
+    },
+    "qwen3-vl-8b-q4": {
+      "backend": "ollama",
+      "model_ref": "qwen3-vl:8b-instruct",
+      "quant": "Q4_K_M",
+      "params_b": 8,
+      "vram_gb": 6.1,
+      "min_vram_gb": 8,
+      "ctx": 32768,
+      "notes": "First vision-language recipe. 6.1GB official tag; requires Ollama >= 0.12.7. Text+Image input. Proven on T4 2026-10-09 (vision smoke test, 12s, 11.5/15.4GB VRAM).",
+      "proven_t4": true,
+      "proven_date": "2026-10-09"
     }
   }
 }
