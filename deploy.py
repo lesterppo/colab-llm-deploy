@@ -27,6 +27,10 @@ COLAB_PY = os.environ.get(
     "COLAB_PY", os.path.expanduser("~/workspace/hermes-colab-cli/colab.py"))
 DRIVER = os.path.join(HERE, "deploy_llm.py")
 CATALOG = os.path.join(HERE, "models.json")
+# Tiny test image for vision recipes (red circle / green triangle /
+# blue rectangle); uploaded to the VM so the describe-test never depends
+# on a tunnel base64 POST.
+VISION_TEST_IMG = os.path.join(HERE, "vision", "vision_test.png")
 
 
 def sh(*args, timeout=120):
@@ -84,6 +88,16 @@ def cmd_deploy(a):
     print("[2/6] Uploading driver, catalog, config...")
     colab("upload", "-s", session, DRIVER, "/content/deploy_llm.py")
     colab("upload", "-s", session, CATALOG, "/content/models.json")
+    if recipe.get("vision"):
+        # Vision recipes get a tiny test image (3.3KB, well under the
+        # ~10MB upload cap) for the VM-side describe-test in step [6/6].
+        if os.path.exists(VISION_TEST_IMG):
+            colab("upload", "-s", session, VISION_TEST_IMG,
+                  "/content/vision_test.png")
+            print("  uploaded vision test image")
+        else:
+            print(f"  WARNING: {VISION_TEST_IMG} missing, vision "
+                  f"describe-test will be skipped")
     cfg = {"backend": recipe["backend"], "model": a.model, "port": 11434}
     if a.hf_token_file:
         cfg["hf_token"] = open(a.hf_token_file).read().strip()
@@ -158,6 +172,33 @@ def cmd_deploy(a):
         except Exception as e:
             print(f"  /api/generate -> HTTP 200, body unreadable "
                   f"({type(e).__name__}; egress proxy quirk) — serving OK")
+        if recipe.get("vision"):
+            # Vision recipes: the text probe above proves the model serves,
+            # but never exercises vision. Run the describe-test VM-side
+            # (localhost bypasses this VM's egress-proxy body-swallow quirk;
+            # base64 is encoded on the VM, never over the tunnel).
+            print("  vision recipe -> VM-side /api/chat images[] test...")
+            vcode = (
+                "import base64, json, urllib.request\n"
+                "img = base64.b64encode(open('/content/vision_test.png',"
+                "'rb').read()).decode()\n"
+                "body = json.dumps({'model': " + json.dumps(tag)
+                + ", 'messages': [{'role': 'user', 'content': 'Describe this "
+                "image in one sentence.', 'images': [img]}], "
+                "'stream': False}).encode()\n"
+                "req = urllib.request.Request("
+                "'http://localhost:11434/api/chat', data=body, "
+                "headers={'Content-Type': 'application/json'})\n"
+                "r = json.load(urllib.request.urlopen(req, timeout=180))\n"
+                "print('VISION-TEST: ' + r['message']['content'][:400])\n"
+            )
+            try:
+                vout = colab("exec", "-s", session, "--code", vcode,
+                             timeout=300)
+                print(f"  {vout[-600:]}")
+            except RuntimeError as e:
+                print(f"  VISION-TEST failed ({e}) — text probe passed, "
+                      f"deploy still OK; vision untested")
     else:  # vllm OpenAI-compatible
         ms = json.load(urllib.request.urlopen(v1 + "/models", timeout=30))
         print(f"  /v1/models -> {[m['id'] for m in ms.get('data', [])]}")
