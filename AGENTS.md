@@ -66,6 +66,7 @@ Modality guides: [image/README.md](image/README.md),
 | gemma4-12b-q4 | gemma4:12b | GREEN, ~6 min |
 | qwen3.5-9b-q4 | qwen3.5:9b | GREEN, ~10 min |
 | mimo-v2.6-9b-q4 | hf.co/bartowski/MiMo-V2.6-Distill-Qwen-9B-GGUF:Q4_K_M | GREEN — Ollama pulls `hf.co/` GGUF refs directly |
+| qwen3-vl-8b-q4 | qwen3-vl:8b-instruct | GREEN 2026-10-09 — first vision-language recipe; vision describe-test 12s, no reasoning leak, 11.5/15.4GB VRAM (kyu008008) |
 
 Queued (recipes in catalog, tags verified, not yet live-tested):
 qwen3.5-4b-q4, qwen3.5-27b-q4 (≥24GB), qwen2.5-7b-awq (vLLM, T4-tight),
@@ -100,6 +101,21 @@ deepseek-coder-6.7b-q4, llama3.1-8b-q4.
 10. **transformers pin**: keep `transformers>=4.46,<5.0` on Colab; 5.x breaks
     things (and Colab's preinstalled deps conflict with tight pins — the
     driver avoids over-pinning).
+11. **qwen3-vl: use the `-instruct` tag, not the bare size tag.** The bare
+    `qwen3-vl:8b` (and `:30b`) tags are thinking builds; Ollama ignores
+    `think=false` on them, so every request burns hidden CoT tokens before
+    answering (community-measured 8–70s on long inputs). For predictable
+    latency always pin `:8b-instruct` / `:30b-a3b-instruct`. (Verified
+    2026-10-09: bare :8b digest 901cae732162 vs :8b-instruct 0533d74300e4.)
+12. **Multi-image same-size merge (ollama/ollama#17321).** Two same-size
+    images in one /api/chat message are silently merged into video frames —
+    the model reports seeing only one image. For multi-image prompts, vary
+    each image's resolution (or use explicit [img-N] placeholders).
+13. **`deploy.py`'s built-in smoke test used to be text-only.** `/api/generate
+    "What is 2+2?"` proves the model serves but never exercised vision.
+    Vision recipes (`"vision": true`) now get an extra VM-side `/api/chat`
+    images[] describe-test during deploy — a green deploy of a vision recipe
+    implies the describe-test passed, not just the text probe.
 
 ## Media pitfalls (image/video/audio, learned live 2026-10-04/05)
 
@@ -138,6 +154,16 @@ deepseek-coder-6.7b-q4, llama3.1-8b-q4.
     torch 2.6.0 (`torchvision::nms` missing → LlamaModel import fails) —
     pin `torchvision==0.21.0` and `pip uninstall -y torchao` after
     installing `chatterbox-tts` (done in `audio/chatterbox/setup.py`).
+12. **T4 (sm_75) has NO fast attention kernel** — torch 2.11+cu130's
+    flash/mem-efficient SDPA both fail with "No available kernel", so
+    SDPA silently falls back to the math path and materializes full
+    [B, heads, seq, seq] score tensors. Wan 2.1 14B OOM'd at sampling
+    step 0 (15.26GB requested at 848x480x33, 9.23GB at 25 frames — both
+    over the 15GB card). Workaround: chunked attention
+    (`attention_mode="comfy"` on WanVideoModelLoader → ComfyUI
+    `optimized_attention`, O(chunk×seq) memory). Developed 2026-10-07
+    for Wan 2.1, **not yet live-tested** — do not treat as proven until
+    a run completes.
 
 ## Teardown discipline
 
