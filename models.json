@@ -165,6 +165,19 @@
       "notes": "First vision-language recipe. 6.1GB official tag; requires Ollama >= 0.12.7. Text+Image input. Proven on T4 2026-10-09 (vision smoke test, 12s, 11.5/15.4GB VRAM).",
       "proven_t4": true,
       "proven_date": "2026-10-09"
+    },
+    "saluki-27b-iq2": {
+      "backend": "llamacpp",
+      "model_ref": "ConwayResearch/Underdog-Saluki-27B-1.0",
+      "gguf_file": "Underdog-Saluki-27B-1.0-IQ2-mix.gguf",
+      "quant": "IQ2-mix",
+      "params_b": 27,
+      "vram_gb": 9,
+      "min_vram_gb": 10,
+      "ctx": 8192,
+      "notes": "Underdog's 2-bit compression of Qwen3.8-27B (qwen3.5 arch, 7.89GB). Needs llama.cpp >= b11493 (driver pins b11552 + cudart bundle; without cudart the server silently falls back to CPU). Serve flags: --jinja -ngl 99 -fa on. Thinking on by default (disable via chat_template_kwargs.enable_thinking=false); temp 0.6/top_p 0.95/top_k 20 for reasoning, temp 0 for fast tool calls. Tool calling verified live on T4 2026-10-11 (well-formed tool_calls). ctx 8192 tested; 32k per model card not tested on T4.",
+      "proven_t4": true,
+      "proven_date": "2026-10-11"
     }
   }
 }
