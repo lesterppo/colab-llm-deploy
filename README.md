@@ -110,6 +110,7 @@ It warms the HF cache for gated/rate-limited repos before serving.
 | `deepseek-coder-6.7b-q4` | Ollama | 6.7B | GGUF Q4_K_M | ~5.5 GB | T4-ok |
 | `qwen2.5-7b-awq` | vLLM | 7B | AWQ | ~9 GB | T4-tight (A100 preferred) |
 | `phi4-14b-q4` | Ollama | 14B | GGUF Q4_K_M | ~12 GB | ≥24 GB (L4/A10G — not T4) |
+| `saluki-27b-iq2` | llama.cpp | 27B | GGUF IQ2-mix | ~9 GB | T4-ok (tool calling verified) |
 
 The driver refuses to load an unquantized 27B+ model on a <30GB GPU instead of
 OOMing silently, and caps vLLM `--max-model-len` at 4096 on the T4 tier
