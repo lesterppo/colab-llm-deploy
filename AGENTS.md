@@ -67,7 +67,7 @@ Modality guides: [image/README.md](image/README.md),
 | qwen3.5-9b-q4 | qwen3.5:9b | GREEN, ~10 min |
 | mimo-v2.6-9b-q4 | hf.co/bartowski/MiMo-V2.6-Distill-Qwen-9B-GGUF:Q4_K_M | GREEN — Ollama pulls `hf.co/` GGUF refs directly |
 | qwen3-vl-8b-q4 | qwen3-vl:8b-instruct | GREEN 2026-10-09 — first vision-language recipe; vision describe-test 12s, no reasoning leak, 11.5/15.4GB VRAM (kyu008008) |
-| saluki-27b-iq2 | ConwayResearch/Underdog-Saluki-27B-1.0 (IQ2-mix) | GREEN 2026-10-11 — **new `llamacpp` backend** (llama.cpp b11552 + cudart bundle; VRAM 8.6–8.9/15.4GB); tool calling verified (well-formed `tool_calls`, the post's headline claim), reasoning 8.2 tok/s (cyc236hk) |
+| saluki-27b-iq2 | ConwayResearch/Underdog-Saluki-27B-1.0 (IQ2-mix) | GREEN 2026-10-11 — **new `llamacpp` backend** (llama.cpp b11552 + cudart bundle; VRAM 8.6–8.9/15.4GB); tool calling verified (well-formed `tool_calls`, the post's headline claim), reasoning 8.2 tok/s (cyc236hk). Deep test same day: ctx 32768 fits (10.4/15.4GB), tool suite 5/6, reasoning 11/12, needle 3/3 @21.6k tok — see [docs/saluki-27b-deep-test.md](docs/saluki-27b-deep-test.md) |
 
 ## The llamacpp backend
 
