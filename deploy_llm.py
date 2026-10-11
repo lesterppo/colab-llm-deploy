@@ -12,13 +12,14 @@ this file). Tunnel URL goes to /content/api_url.txt and /content/tunnel.log
 (both covered by hermes-colab-cli's tunnel_discover path list).
 
 Config: /content/deploy_config.json
-  {"backend": "ollama"|"vllm", "model": "<catalog key in models.json>",
+  {"backend": "ollama"|"vllm"|"llamacpp", "model": "<catalog key in models.json>",
    "hf_token": "<optional, file only>", "port": 8000, "max_model_len": 4096}
 Catalog: /content/models.json (uploaded alongside by the orchestrator).
+llamacpp recipes need "gguf_file" (the GGUF filename inside the HF repo).
 
 Stdlib only. No secrets are ever printed.
 """
-import subprocess, sys, os, time, re, json, shutil, urllib.request
+import subprocess, sys, os, time, re, json, shutil, urllib.request, glob
 
 PORT_DEFAULT = 8000
 CONFIG_FILE = "/content/deploy_config.json"
@@ -29,9 +30,21 @@ API_URL_FILE = "/content/api_url.txt"
 DEPLOY_LOG = "/content/deploy_llm.log"
 
 # Pinned versions (mirror versions.env)
-OLLAMA_VER = "0.34.4"
+# NOTE 2026-10-05: Ollama >= 0.35 is required for the /v1/systemone
+# decision-model endpoint (Cloudflare Clef / Clef-flash, Ollama v0.35 release).
+OLLAMA_VER = "0.35.1"
 CLOUDFLARED_VER = "2026.9.3"
 VLLM_VER = "0.30.0"
+LLAMACPP_VER = "b11552"
+LLAMACPP_BUILD = "11552"  # numeric part, for --version idempotency check
+# llama.cpp ships as a plain tarball: bin/ inside a versioned top-level dir,
+# shared libs next to it, and CUDA runtime in a SEPARATE cudart tarball
+# (libggml-cuda.so cannot load without libcudart — without it the server
+# silently falls back to CPU: 0 MiB VRAM, ~0.5 tok/s. Learned 2026-10-11.)
+LLAMACPP_DIST = "/content/llama.cpp"
+LLAMACPP_BIN = f"{LLAMACPP_DIST}/bin/llama-server"
+LLAMACPP_CUDART = "/content/cudart"
+LLAMACPP_MODELS = "/content/models"
 # Ollama ships as a tarball with a fixed internal layout (bin/ollama +
 # lib/ollama runners). Extract the whole thing to OLLAMA_DIST so the
 # relative layout is preserved; the binary finds its runners next to it.
@@ -213,6 +226,53 @@ try:
              f"vllm=={VLLM_VER}", "transformers>=4.46,<5.0",
              "huggingface_hub>=0.26"], timeout=1800)
 
+    # llama.cpp (pinned) — only for the llamacpp backend
+    if backend == "llamacpp":
+        print(f"  Installing llama.cpp {LLAMACPP_VER} (CUDA)...", flush=True)
+        need_llama = not (
+            os.path.exists(LLAMACPP_BIN) and LLAMACPP_BUILD in
+            run([LLAMACPP_BIN, "--version"], capture_output=True, text=True,
+                timeout=15).stdout)
+        if need_llama:
+            url = ("https://github.com/ggml-org/llama.cpp/releases/download/"
+                   f"{LLAMACPP_VER}/llama-{LLAMACPP_VER}-bin-ubuntu-cuda-12.8-x64.tar.gz")
+            arc = "/tmp/llama.tar.gz"
+            run(["curl", "-sSL", "--fail", "-o", arc, url], timeout=600)
+            if os.path.isdir(LLAMACPP_DIST):
+                shutil.rmtree(LLAMACPP_DIST)
+            os.makedirs(LLAMACPP_DIST, exist_ok=True)
+            run(["tar", "xzf", arc, "-C", LLAMACPP_DIST], timeout=300)
+            os.remove(arc)
+            # Find the real binary (tarball nests it under a versioned dir)
+            # and expose it at the stable LLAMACPP_BIN path.
+            hits = glob.glob(f"{LLAMACPP_DIST}/**/llama-server", recursive=True)
+            assert hits, "llama-server not found in llama.cpp tarball"
+            os.makedirs(os.path.dirname(LLAMACPP_BIN), exist_ok=True)
+            if os.path.islink(LLAMACPP_BIN) or os.path.exists(LLAMACPP_BIN):
+                os.remove(LLAMACPP_BIN)
+            os.symlink(hits[0], LLAMACPP_BIN)
+            print(f"  llama.cpp {LLAMACPP_VER} ready.", flush=True)
+        # cudart bundle (separate tarball; libggml-cuda.so needs libcudart)
+        cudart_ok = bool(glob.glob(f"{LLAMACPP_CUDART}/libcudart.so*"))
+        if not cudart_ok:
+            url = ("https://github.com/ggml-org/llama.cpp/releases/download/"
+                   f"{LLAMACPP_VER}/cudart-llama-{LLAMACPP_VER}-bin-ubuntu-cuda-12.8-x64.tar.gz")
+            arc = "/tmp/cudart.tar.gz"
+            run(["curl", "-sSL", "--fail", "-o", arc, url], timeout=600)
+            os.makedirs(LLAMACPP_CUDART, exist_ok=True)
+            run(["tar", "xzf", arc, "-C", LLAMACPP_CUDART], timeout=300)
+            os.remove(arc)
+            # Flatten: symlink every lib*.so* to the cudart root so
+            # LD_LIBRARY_PATH can point at one dir.
+            for p in glob.glob(f"{LLAMACPP_CUDART}/**/lib*.so*", recursive=True):
+                tgt = os.path.join(LLAMACPP_CUDART, os.path.basename(p))
+                if not os.path.exists(tgt):
+                    os.symlink(p, tgt)
+            print("  cudart bundle ready.", flush=True)
+        if not glob.glob(f"{LLAMACPP_CUDART}/libcudart.so*"):
+            die("cudart bundle extracted but libcudart.so* not found — "
+                "GPU offload would silently fall back to CPU.")
+
     # torchao pitfall: Colab ships torchao 0.10, peft needs >0.16 -> ImportError.
     # Uninstall right after pip installs; peft falls back to its default path.
     run([sys.executable, "-m", "pip", "uninstall", "-y", "torchao"],
@@ -273,6 +333,28 @@ try:
         print("  Pulling model (may take several minutes)...", flush=True)
         run([OLLAMA_BIN, "pull", model_ref], timeout=3600, env=env)
         print("  Model pulled.", flush=True)
+    elif backend == "llamacpp":
+        # GGUF single-file download via huggingface_hub (stdlib-adjacent,
+        # already present on Colab). HF_XET_HIGH_PERFORMANCE=1 for speed.
+        os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
+        gguf_file = recipe.get("gguf_file")
+        if not gguf_file:
+            die("llamacpp recipe needs 'gguf_file' (GGUF filename in the "
+                "HF repo).")
+        os.makedirs(LLAMACPP_MODELS, exist_ok=True)
+        print(f"  Downloading {gguf_file} from {model_ref}...", flush=True)
+        code = (
+            "from huggingface_hub import snapshot_download; "
+            f"snapshot_download({model_ref!r}, allow_patterns=[{gguf_file!r}], "
+            f"local_dir={LLAMACPP_MODELS!r}, resume_download=True)"
+        )
+        run([sys.executable, "-c", code], timeout=3600)
+        gguf_path = os.path.join(LLAMACPP_MODELS, gguf_file)
+        if not os.path.exists(gguf_path):
+            die(f"GGUF not found after download: {gguf_path}")
+        cfg["gguf_path"] = gguf_path
+        print(f"  GGUF ready: {os.path.getsize(gguf_path) / 1e9:.2f} GB.",
+              flush=True)
     else:  # vllm: warm the HF cache now so serve doesn't download cold
         # HF downloads: hf-xet is the default high-performance backend in
         # current huggingface_hub; HF_HUB_ENABLE_HF_TRANSFER is
@@ -317,6 +399,27 @@ try:
         wait_healthy("http://127.0.0.1:11434/v1/models", srv, 60, "ollama /v1")
         cfg["server_pid"] = srv.pid
         print("  Ollama serving (OpenAI-compatible /v1).", flush=True)
+    elif backend == "llamacpp":
+        ctx = int(cfg.get("max_model_len") or recipe.get("ctx", 8192))
+        gguf_path = cfg.get("gguf_path") or os.path.join(
+            LLAMACPP_MODELS, recipe.get("gguf_file", ""))
+        cmd = [LLAMACPP_BIN, "-m", gguf_path, "--jinja", "-ngl", "99",
+               "-fa", "on", "-c", str(ctx),
+               "--host", "127.0.0.1", "--port", str(port)]
+        env = dict(os.environ,
+                   LD_LIBRARY_PATH=(f"{LLAMACPP_CUDART}:"
+                                    f"{os.environ.get('LD_LIBRARY_PATH', '')}"))
+        llama_log = open("/content/llama-server.log", "a")
+        srv = subprocess.Popen(cmd, env=env,
+                               stdout=llama_log, stderr=subprocess.STDOUT)
+        cfg["server_proc"] = srv
+        cfg["server_pid"] = srv.pid
+        wait_healthy(f"http://127.0.0.1:{port}/health", srv, 600,
+                     "llama-server")
+        wait_healthy(f"http://127.0.0.1:{port}/v1/models", srv, 60,
+                     "llama-server /v1")
+        print(f"  llama-server serving on :{port} (ctx={ctx}, "
+              f"OpenAI-compatible /v1).", flush=True)
     else:
         max_len = int(cfg.get("max_model_len") or recipe.get("ctx", 4096))
         # Cap context by VRAM tier: activations OOM, not weights
