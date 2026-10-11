@@ -228,7 +228,7 @@ def cmd_undeploy(a):
     print(f"Tearing down session '{a.session}'...")
     kill_code = (
         "import subprocess\n"
-        "for pat in ('ollama serve', 'vllm.entrypoints', 'cloudflared tunnel'):\n"
+        "for pat in ('ollama serve', 'vllm.entrypoints', 'llama-server', 'cloudflared tunnel'):\n"
         "    subprocess.run(['pkill', '-f', pat])\n"
         "print('procs killed')"
     )
