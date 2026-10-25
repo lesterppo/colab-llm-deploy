@@ -166,6 +166,16 @@
       "proven_t4": true,
       "proven_date": "2026-10-09"
     },
+    "nemotron-3.5-bolt-e4b-q4": {
+      "backend": "ollama",
+      "ctx": 8192,
+      "min_vram_gb": 10,
+      "model_ref": "nemotron-3.5-bolt:e4b-q4_K_M",
+      "notes": "NVIDIA Nemotron 3.5 Bolt E4B 4GB, released 2026-10-23: RL post-train of Google Gemma 4 E4B, 8B total / 4B effective, 64K context on the model card, temp 1.0 / top_p 0.95, thinking via chat-template enable_thinking. Ollama e4b-q4_K_M build ~7.9GB, T4-comfortable; driver caps the 64K card claim to 8192 on <30GB GPUs. REQUIRES Ollama >= 0.40.10 (support landed 2026-10-23; 0.35.1 fails the pull with HTTP 412). Official HF GGUF fallback (same weights): nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB / Nemotron-3.5-Bolt-E4B-Q4_K_M.gguf (6.18GB).",
+      "params_b": 8,
+      "quant": "Q4_K_M",
+      "vram_gb": 9
+    },
     "saluki-27b-iq2": {
       "backend": "llamacpp",
       "model_ref": "ConwayResearch/Underdog-Saluki-27B-1.0",
