@@ -195,6 +195,25 @@ deepseek-coder-6.7b-q4, llama3.1-8b-q4.
     for Wan 2.1, **not yet live-tested** — do not treat as proven until
     a run completes.
 
+## Supervisor (surviving longer than one session)
+
+Free Colab sessions are reclaimed server-side; nothing here prevents
+that. `supervise.py` is the honest mitigation: a 5-min real heartbeat
+exec (resets the 90-min idle timer), death detection, and rate-limited
+auto-redeploy (3 attempts, 60/120/240s backoff, quota failures count,
+account rotation opt-in only, never cyc236de/cyc236hk). It keeps a
+tunnel when deploy.py's smoke test 403s but the VM reports running,
+and — learned 2026-10-25 — a single heartbeat timeout is treated as
+transient (2 consecutive transient failures before redeploy), never
+as a crash: an uncaught `TimeoutExpired` once killed the supervisor
+while the Colab session was still alive.
+
+```bash
+python3 supervise.py --model nemotron-3.5-bolt-e4b-q4 --gpu T4 \
+  --check-interval 300 --max-restarts 3
+# latest tunnel: current-tunnel.txt ; full state: supervisor-state.json
+```
+
 ## Teardown discipline
 
 Always `undeploy` when done: kills server/tunnel procs, then `stop`
