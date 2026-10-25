@@ -1,0 +1,31 @@
+base: /content/gemma4_local
+task: sft
+backend: transformers
+
+data:
+  train: ./soup_data.jsonl
+  format: alpaca
+  max_length: 128
+
+training:
+  epochs: 1
+  lr: 2e-4
+  batch_size: 1
+  gradient_accumulation_steps: 4
+  quantization: 4bit
+  stream_layers: false
+  gradient_checkpointing: true
+  scheduler: linear
+  warmup_ratio: 0.05
+  weight_decay: 0.0
+  logging_steps: 5
+  save_steps: 100
+  lora:
+    r: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules:
+      - q_proj
+      - v_proj
+
+output: ./soup_gemma4_output/
