@@ -32,7 +32,10 @@ DEPLOY_LOG = "/content/deploy_llm.log"
 # Pinned versions (mirror versions.env)
 # NOTE 2026-10-05: Ollama >= 0.35 is required for the /v1/systemone
 # decision-model endpoint (Cloudflare Clef / Clef-flash, Ollama v0.35 release).
-OLLAMA_VER = "0.35.1"
+# NOTE 2026-10-25: bumped to 0.40.11 — Nemotron 3.5 Bolt E4B requires
+# Ollama >= 0.40.10 (its support landed in 0.40.10, 2026-10-23); the old
+# 0.35.1 pin fails the pull with HTTP 412 "requires a newer version".
+OLLAMA_VER = "0.40.11"
 CLOUDFLARED_VER = "2026.9.3"
 VLLM_VER = "0.30.0"
 LLAMACPP_VER = "b11552"
@@ -333,6 +336,32 @@ try:
         print("  Pulling model (may take several minutes)...", flush=True)
         run([OLLAMA_BIN, "pull", model_ref], timeout=3600, env=env)
         print("  Model pulled.", flush=True)
+        # 2026-10-15: wire the recipe's ctx into Ollama. Ollama serves at
+        # num_ctx=4096 by default, so every catalog recipe claiming more
+        # (8192 and up) was silently truncated at serve time — caught on the
+        # CLM run, whose harness peaks ~8k tokens. Build a Modelfile
+        # variant carrying the recipe's num_ctx and record it as the model
+        # actually serving, so the orchestrator's smoke test probes the
+        # right tag.
+        ctx = int(cfg.get("max_model_len") or recipe.get("ctx") or 0)
+        served = model_ref
+        if vram and vram < 30 and ctx > 8192:
+            # T4-class KV-cache guard: 8192 is proven for 7-20B Q4 on 15GB;
+            # >8k claims (clef-flash 262144, qwen3-vl 32768) need >=24GB.
+            print(f"  Capping num_ctx {ctx} -> 8192 for {vram:.1f}GB GPU.",
+                  flush=True)
+            ctx = 8192
+        if ctx and ctx != 4096:
+            variant = f"{cfg['model']}-ctx{ctx}"
+            mf_path = "/tmp/ctx.Modelfile"
+            with open(mf_path, "w") as mf:
+                mf.write(f"FROM {model_ref}\nPARAMETER num_ctx {ctx}\n")
+            run([OLLAMA_BIN, "create", variant, "-f", mf_path],
+                timeout=600, env=env)
+            served = variant
+            print(f"  Context variant ready: {variant} (num_ctx={ctx}).",
+                  flush=True)
+        cfg["served_model"] = served
     elif backend == "llamacpp":
         # GGUF single-file download via huggingface_hub (stdlib-adjacent,
         # already present on Colab). HF_XET_HIGH_PERFORMANCE=1 for speed.
@@ -441,7 +470,8 @@ try:
         wait_healthy(f"http://127.0.0.1:{port}/v1/models", srv, 900, "vllm")
         print(f"  vLLM serving on :{port} (bf16, max_len={max_len}).", flush=True)
     write_status("server_start", "server healthy",
-                 extra={"server_pid": cfg.get("server_pid")})
+                 extra={"server_pid": cfg.get("server_pid"),
+                        "served_model": cfg.get("served_model")})
 except SystemExit:
     raise
 except Exception as e:
@@ -485,7 +515,8 @@ try:
         f.write(url)
     cfg["tunnel_proc"] = tp
     write_status("ready", url, extra={"tunnel_url": url,
-                                      "server_pid": cfg.get("server_pid")})
+                                      "server_pid": cfg.get("server_pid"),
+                                      "served_model": cfg.get("served_model")})
     print(f"\n{'=' * 60}\nDEPLOYED: {url}\nbackend={backend} model={cfg['model']}\n{'=' * 60}",
           flush=True)
 except SystemExit:
@@ -521,7 +552,8 @@ try:
         write_status("running", cfg.get("tunnel_url", ""),
                      extra={"tunnel_url": cfg.get("tunnel_url"),
                             "tunnel_restarts": restarts,
-                            "server_pid": cfg.get("server_pid")})
+                            "server_pid": cfg.get("server_pid"),
+                            "served_model": cfg.get("served_model")})
 except SystemExit:
     raise
 except Exception as e:
