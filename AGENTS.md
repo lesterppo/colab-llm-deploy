@@ -214,6 +214,45 @@ python3 supervise.py --model nemotron-3.5-bolt-e4b-q4 --gpu T4 \
 # latest tunnel: current-tunnel.txt ; full state: supervisor-state.json
 ```
 
+**Restart-proofing (2026-10-25):** `supervise_watchdog.sh` + a 10-minute
+cron (`supervisor-watchdog`) restarts the supervisor if its process is
+dead, without starting a duplicate and without redeploying — a restarted
+supervisor first checks `session_alive()` and picks up the live session.
+Tested live: killed the supervisor, watchdog restarted it, next heartbeat
+was alive with the tunnel unchanged. The cron only reports on a restart,
+a >20-min heartbeat gap, or a watchdog failure; routine checks are silent.
+
+**Mini-benchmark (2026-10-25, `mini_bench.py`):** 28 locally-scored checks
+on Bolt E4B (temp 0, think off except reasoning): tool 6/6, hierarchy 4/5,
+constraints 6/6, multi-turn 3/3, grounding 2/2, reasoning 6/6 — **27/28**.
+The one fail: system told it to end every reply with END, user said don't,
+it answered "4" with no END. Think-on 9×8 = 72 correct; think-off 9×8 =
+"Ninety-two" — do not trust think-off arithmetic on this model. This is a
+mini-suite inspired by NVIDIA's axes (BFCL, IHEval, IFBench, MultiChallenge,
+RULER), not their official harness.
+
+**Soup + Gemma 4 on T4 (2026-10-25, NEGATIVE for Soup as-is):** Bolt itself
+cannot be Soup-trained — NVIDIA's repo is GGUF-only (no safetensors, no
+config). Its parent `google/gemma-4-E4B-it` (ungated safetensors, 15.99GB,
+model_type `gemma4`) hits four stacked blockers in Soup 0.72.4:
+(1) transformers 4.57.6 GemmaFast crashes on the tokenizer's
+`extra_special_tokens: ['<|video|>']` list (expects a dict) — workaround:
+patch a local copy's tokenizer_config to drop that key;
+(2) transformers 4.57.6 does not recognise `gemma4` at all — workaround:
+transformers from source (5.21.0.dev0) recognises `Gemma4Config`;
+(3) layer streaming explicitly rejects gemma4 (supported up to
+gemma3_text);
+(4) non-streaming NF4 QLoRA loads 100% of weights but OOMs at the first
+training step, even with the full GPU free, and even at the minimum
+(batch 1, seq 128, gradient_checkpointing on). So Soup + Gemma 4 needs a
+≥24GB GPU, Soup adding gemma4 to streaming, or a different trainer.
+Configs + dataset + tokenizer patch for the attempt live in
+`soup_gemma4*.yaml`, `soup_data.jsonl`, `patch_tokenizer.py`. Note:
+`ollama stop` hung on a second attempt while `pkill -f llama-server`
+freed VRAM instantly (Ollama serve stays up, a chat request respawns the
+model in ~40s); foreground `colab.py exec` also hung on that step while
+`exec_bg` worked — prefer `exec_bg` for stop/train launches.
+
 ## Teardown discipline
 
 Always `undeploy` when done: kills server/tunnel procs, then `stop`
