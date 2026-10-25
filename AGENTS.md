@@ -68,6 +68,7 @@ Modality guides: [image/README.md](image/README.md),
 | mimo-v2.6-9b-q4 | hf.co/bartowski/MiMo-V2.6-Distill-Qwen-9B-GGUF:Q4_K_M | GREEN — Ollama pulls `hf.co/` GGUF refs directly |
 | qwen3-vl-8b-q4 | qwen3-vl:8b-instruct | GREEN 2026-10-09 — first vision-language recipe; vision describe-test 12s, no reasoning leak, 11.5/15.4GB VRAM (kyu008008) |
 | saluki-27b-iq2 | ConwayResearch/Underdog-Saluki-27B-1.0 (IQ2-mix) | GREEN 2026-10-11 — **new `llamacpp` backend** (llama.cpp b11552 + cudart bundle; VRAM 8.6–8.9/15.4GB); tool calling verified (well-formed `tool_calls`, the post's headline claim), reasoning 8.2 tok/s (cyc236hk). Deep test same day: ctx 32768 fits (10.4/15.4GB), tool suite 5/6, reasoning 11/12, needle 3/3 @21.6k tok — see [docs/saluki-27b-deep-test.md](docs/saluki-27b-deep-test.md) |
+| nemotron-3.5-bolt-e4b-q4 | nemotron-3.5-bolt:e4b-q4_K_M | VM-side GREEN 2026-10-25, tunnel RED — NVIDIA Bolt E4B (Gemma 4 E4B base, 8B/4B eff, 7.9GB Ollama build, ctx8192 variant, VRAM 7,861/15,360 MiB, "What is 2+2?" → "The answer is four."). **Requires Ollama ≥0.40.10** (driver bumped 0.35.1→0.40.11; 0.35.1 fails the pull with HTTP 412). Two fresh trycloudflare subdomains both returned Cloudflare 403 "Your request was blocked" from this VM's egress while the tunnel process was healthy — so this recipe is NOT marked `proven_t4` until a tunnel smoke test passes; if you see the same 403, test the URL from a non-datacenter network before blaming the model. |
 
 ## The llamacpp backend
 
@@ -131,6 +132,20 @@ deepseek-coder-6.7b-q4, llama3.1-8b-q4.
     Vision recipes (`"vision": true`) now get an extra VM-side `/api/chat`
     images[] describe-test during deploy — a green deploy of a vision recipe
     implies the describe-test passed, not just the text probe.
+14. **Recipe `ctx` is now wired through to Ollama (2026-10-15).** Ollama
+    serves at `num_ctx=4096` by default; the driver used to ignore the
+    catalog's `ctx` for the ollama backend, so every recipe claiming 8192+
+    was silently truncated at serve time (caught on the CLM run, whose
+    harness peaks ~8k tokens). The driver now builds a
+    `<catalog-key>-ctx<N>` Modelfile variant after pull and records it as
+    `served_model` in `/content/deploy_status.json`; `deploy.py` probes the
+    variant in the smoke test. >8k claims are capped to 8192 on <30GB GPUs
+    (KV-cache OOM guard); `clef-flash` 262144 / `qwen3-vl` 32768 need ≥24GB
+    to serve their full claims.
+15. **Ollama is not on PATH in `colab.py console` shells.** The binary lives
+    at `/content/ollama-dist/bin/ollama` (`which ollama` returns nothing) —
+    use the full path or `export PATH=/content/ollama-dist/bin:$PATH` in
+    hand-rolled console commands (driver itself always uses the full path).
 
 ## Media pitfalls (image/video/audio, learned live 2026-10-04/05)
 
