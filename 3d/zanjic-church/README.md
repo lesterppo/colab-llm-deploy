@@ -342,3 +342,96 @@ zanjic_green_demo_densify.html (12.6 MB, JS syntax-checked,
 18,844 points). Trained PLY kept locally as
 zanjic_trained_dn_1e-3_30000.ply. Session stopped, registry
 deleted, arxiv rotation untouched.
+
+## Handoff for another agent (2026-11-05)
+
+Everything needed to reproduce or continue this work is now in this
+directory. The elimination record above is the starting point: do NOT
+re-run framing, clutter, 640 px, tex+1e-3, or the mapped doses
+(1e-8/1e-5/1e-4/3e-4/1e-3/1e-2) expecting different outcomes without
+a genuinely new hypothesis.
+
+### File map
+
+- `build_zanjic.py` — lively procedural scene + medium lively PLY
+  (the sharp phone demo baseline; procedural wins on sharpness).
+- `build_zanjic_clean.py` — the CLEAN scene (pre-lively colours, no
+  lively prims). This is the dataset every training run used.
+  Run it, then `tar czf dataset.tar.gz dataset dataset_val` — PNGs
+  MUST be saved uncompressed (see the 16,387-byte Brush bug above).
+- `build_zanjic_tex.py` — textured variant (sea ±8% sinusoidal,
+  soft directional cloud variation on sky/sea_bg).
+- `setup.py` — Colab VM setup (Vulkan ICD via libnvidia-gl-<series>
+  from `nvidia-smi`, Brush 0.3.0 binary). Identical for all runs.
+- `train_clean.py` — baseline, default scale loss (1e-8).
+- `train_d4.py` — dose 1e-4. `train_d3.py` — dose 1e-3, THE GREEN
+  RUN. `train_m34.py` — dose 3e-4. `train_tex.py` — textured + 1e-5.
+  `train_tx3.py` — textured + 1e-3. `train_dn.py` — 1e-3 +
+  pro-growth densification (threshold 1e-5, fraction 0.3, stop 30k).
+  Each script trains 30,000 steps, evals every 5,000 steps, exports
+  to its own `dataset_exports_*` dir, and writes a status JSON.
+- `render_ply.py` — purpose-built CPU 3DGS EWA renderer (SH degree
+  3, val cameras R=4.2/elev 20°/offset 3.75°/FOV 0.70/400×400).
+  Brush cannot render a standalone PLY, so this is how the
+  stripping A/B was done. Caveat: it under-paints small splats
+  (renders darker than Brush/Spark); only same-renderer A/B
+  comparisons are evidence, never its absolute PSNR.
+- `strip_giants.py` — removes max-exp(scale) > 0.5 splats, rewrites
+  the vertex count. Verified: reproduces the shipped stripped PLY
+  byte-identically. Stripping itself is CLOSED (renderer + phone
+  agree it does not help); kept for reproducibility only.
+- `trained/zanjic_trained_1e-3_30000.ply` — GREEN model, 26,447
+  points, mean val PSNR 16.96 dB. Current demo default.
+- `trained/zanjic_trained_dn_1e-3_30000.ply` — densified model,
+  18,844 points, mean val PSNR 18.65 dB. Higher PSNR, lower density.
+- `demos/zanjic_green_demo.html` — GREEN demo (15.0 MB, spin-on).
+- `demos/zanjic_green_demo_densify.html` — densified demo
+  (12.6 MB, spin-on).
+
+### Reproduce a training run (Colab T4, colab-rs)
+
+1. Build the dataset with `build_zanjic_clean.py` (or `_tex.py`).
+2. Create a session on a VERIFIED-IDLE account only, with a
+   per-account `--token-file` and an isolated `--config` registry.
+   NEVER switch the VM-global active account; NEVER touch the
+   arxiv training rotation. Recently used idle accounts:
+   ppoppo2052, cyc236es. AVOID: kyu008008/kyu009009 (other chats),
+   cyc236ha, kyu110110 (possibly claimed), supervisor-only
+   cyc236de/cyc236hk, ppoppo205 (other chat), 5stardse (token
+   dead since 2026-11-05 06:34 HKT — needs a fresh sign-in).
+3. Upload `dataset.tar.gz`, `setup.py`, `train_*.py`; run setup
+   detached, wait for ready, run train detached (~270–410 s).
+4. `colab-rs download` FAILS on raw binaries: download exports
+   and eval renders as base64 and decode locally. Compute val PSNR
+   locally against `dataset_val` (same computation as all numbers
+   in this README). Judge sharpness visually, never by mean PSNR
+   alone (the 1e-2 flat-colour trap: 14.64 dB from 4 splats).
+5. Stop the session and delete the registry when done.
+
+### Build a phone demo
+
+`../viewer/build_standalone.py --ply trained/<model>.ply --out
+<name>.html --spin-on` (title/subtitle flags available). The repo
+builder fetches three/Spark from CDN at build time; on a
+CDN-blocked VM, replace the four lib URLs with local file paths
+(three.module.js, three.core.js, Pass.js, spark.module.js) and
+keep the three-core rewrite (three.module.js wrapper import
+rewritten to bare specifier `three-core`, mapped in the importmap
+— relative imports cannot resolve from blob: URLs). Check: no
+unfilled template tokens, JS syntax OK, embedded PLY byte-identical
+to the trained file. The phone's status-line text / visual verdict
+is ground truth; this VM cannot reliably verify these pages.
+
+### Open threads (2026-11-05 07:28 HKT)
+
+- IMMEDIATE: phone comparison of `demos/zanjic_green_demo_densify
+  .html` vs `demos/zanjic_green_demo.html`. If densified looks
+  sharper, it becomes the demo default; if similarly blurry,
+  densification joins the closed list and trained-sharpness work
+  is out of knobs (only genuinely new hypotheses remain).
+- The lively-v2 procedural phone confirmation (full 327k vs
+  embedded 87.5k fallback) from 2026-11-04 was never confirmed and
+  is overtaken by the GREEN demo thread.
+- Trained PLYs for the failed variants (3e-4, tex+1e-3, tex+1e-5,
+  1e-4, clean baseline) were NOT pushed; their scripts and numbers
+  above reproduce them.
