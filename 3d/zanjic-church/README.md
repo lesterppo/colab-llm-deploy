@@ -131,3 +131,24 @@ scene, not framing or clutter. Next pick, named but NOT run: Brush
 optimizer knobs — `--scale-loss-weight` to penalise the giant
 translucent splats directly (the observed failure mode), since
 framing, clutter, and step count are now all eliminated as causes.
+
+## Scale-loss knob run (2026-11-04, the delegated pick after the above)
+
+The pick was `--scale-loss-weight 1e-2` (Brush 0.3.0 default 1e-8),
+the ONLY change vs the clean run: same clean dataset, cameras,
+30,000 steps, T4, rc=0 in 256 s. Result: **model collapse — NOT
+GREEN, and a metric warning.** Splat counts: 19,274 at 5k, 19,874 at
+10k, 2,434 at 15k, **4 points at 20k/25k/30k** — the weight was orders
+of magnitude too strong and the MCMC pruning annihilated the model.
+The trap: mean val PSNR at 30k read **14.64 dB**, higher than the
+clean run's 12.85, which a numbers-only report would have called an
+improvement. It is not: the 30k eval renders are a FLAT solid colour
+(no sky gradient, no sea, no church at all) and the 15k renders are
+nearly black. A flat average-colour image scores ~14.6 on this
+dataset because most pixels are background — so **mean PSNR alone
+is nearly meaningless here**; every future verdict needs the visual
+check (done for this run) or a foreground-masked PSNR. What the run
+did prove: the scale-loss term DOES bite hard on splat survival, so
+the mechanism is real but the dose was wrong. Next probe, named but
+NOT run: `--scale-loss-weight 1e-5` (log-middle between the 1e-8
+default and the lethal 1e-2), evaluated with masked PSNR + visuals.
