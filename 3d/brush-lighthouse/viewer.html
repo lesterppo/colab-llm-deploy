@@ -13,7 +13,7 @@
     pointer-events: none; }
   #hud h1 { margin: 0; font-size: 18px; }
   #hud p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
-  #status { margin-top: 6px; font-size: 13px; color: #ffd166; }
+  #status { margin-top: 6px; font-size: 13px; color: #ffd166; word-break: break-word; }
   #bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px;
     display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
     background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.55)); }
@@ -23,21 +23,6 @@
   button:active, label.btn:active { background: #fff; }
   #file { display: none; }
 </style>
-<script>
-  // Runs BEFORE the module below, so a failed CDN import still shows a
-  // real error instead of the eternal "Loading splat…" text. The module
-  // script clears this timer by setting window.__viewerStarted = true.
-  window.addEventListener("error", function (e) {
-    var s = document.getElementById("status");
-    if (s) s.textContent = "Error loading viewer: " + (e.message || "library failed to load — check connection, then reload.");
-  }, true);
-  setTimeout(function () {
-    if (!window.__viewerStarted) {
-      var s = document.getElementById("status");
-      if (s) s.textContent = "Viewer library did not start (Spark/three.js CDN unreachable?) — reload the page, or tap “Open a PLY file” after it loads.";
-    }
-  }, 20000);
-</script>
 <script type="importmap">
 {
   "imports": {
@@ -53,7 +38,7 @@
   <h1>Lighthouse Island at Dusk</h1>
   <p>Brush-trained Gaussian splat &middot; 123,025 points &middot; 30,000 steps</p>
   <p>1 finger: look around &middot; 2 fingers: move &middot; Desktop: scroll to zoom</p>
-  <div id="status">Loading splat&hellip; (28 MB, may take a few seconds)</div>
+  <div id="status">Starting viewer…</div>
 </div>
 <div id="bar">
   <button id="reset">Reset view</button>
@@ -61,85 +46,126 @@
   <label class="btn" for="file">Open a PLY file</label>
   <input id="file" type="file" accept=".ply,.spz,.splat,.ksplat">
 </div>
-<script type="module">
-  import * as THREE from "three";
-  import { SparkRenderer, SplatMesh, SparkControls } from "@sparkjsdev/spark";
-
-  window.__viewerStarted = true;
+<script>
+  // Classic script, NOT a module: it runs even if the CDN libraries fail,
+  // loads them one at a time with dynamic import() so a failure names the
+  // failing step, and falls back to Spark 2.1.0 if 2.4.0 fails to import.
+  // (The previous version used a static module script: a failed import
+  // produced only a blank "library failed to load" with no detail.)
   const statusEl = document.getElementById("status");
   const setStatus = (t) => { statusEl.textContent = t; };
+  const errText = (e) => (e && e.message) ? e.message : String(e);
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b1a26);
-  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 1000);
-  const HOME_POS = new THREE.Vector3(4.6, 2.8, 4.6);
-  const HOME_TGT = new THREE.Vector3(0, 1.0, 0);
-  camera.position.copy(HOME_POS);
-  camera.lookAt(HOME_TGT);
+  async function main() {
+    let THREE, sparkMod;
+    try {
+      setStatus("Loading three.js…");
+      THREE = await import("three");
+    } catch (e) {
+      setStatus("FAILED at three.js: " + errText(e) + " — check connection, then reload.");
+      return;
+    }
+    try {
+      setStatus("Loading Spark 2.4.0…");
+      sparkMod = await import("@sparkjsdev/spark");
+    } catch (e) {
+      setStatus("Spark 2.4.0 failed (" + errText(e) + ") — trying Spark 2.1.0…");
+      try {
+        sparkMod = await import("https://sparkjs.dev/releases/spark/2.1.0/spark.module.js");
+      } catch (e2) {
+        setStatus("FAILED at Spark (2.4.0 and 2.1.0): " + errText(e2) + " — check connection, then reload.");
+        return;
+      }
+    }
+    const { SparkRenderer, SplatMesh, SparkControls } = sparkMod;
+    if (!SparkRenderer || !SplatMesh || !SparkControls) {
+      setStatus("FAILED: Spark loaded but is missing SparkRenderer/SplatMesh/SparkControls — library version mismatch.");
+      return;
+    }
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setSize(innerWidth, innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  const spark = new SparkRenderer({ renderer });
-  scene.add(spark);
-  const controls = new SparkControls({ canvas: renderer.domElement });
-
-  let mesh = null, spinning = false;
-  function loadMesh(opts) {
-    if (mesh) { scene.remove(mesh); mesh.dispose(); }
-    setStatus("Loading splat…");
-    mesh = new SplatMesh({
-      ...opts,
-      onProgress: (e) => {
-        if (e.total > 0) setStatus(`Loading splat… ${Math.round(e.loaded / e.total * 100)}%`);
-      },
-      onLoad: () => setStatus("Loaded — drag to look around."),
-    });
-    scene.add(mesh);
-  }
-
-  // ?ply=<url> overrides the built-in scene; otherwise the trained PLY below.
-  const params = new URLSearchParams(location.search);
-  const PLY_URL = params.get("ply") || "https://cdn.jsdelivr.net/gh/lesterppo/colab-llm-deploy@main/3d/brush-lighthouse/lighthouse_trained.ply";
-  if (PLY_URL && !PLY_URL.startsWith("__")) {
-    loadMesh({ url: PLY_URL });
-  } else {
-    setStatus("No hosted PLY linked — tap “Open a PLY file” and pick lighthouse_trained.ply.");
-  }
-
-  document.getElementById("reset").onclick = () => {
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1a26);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 1000);
+    const HOME_POS = new THREE.Vector3(4.6, 2.8, 4.6);
+    const HOME_TGT = new THREE.Vector3(0, 1.0, 0);
     camera.position.copy(HOME_POS);
     camera.lookAt(HOME_TGT);
-    if (mesh) mesh.rotation.set(0, 0, 0);
-  };
-  document.getElementById("spin").onclick = (e) => {
-    spinning = !spinning;
-    e.target.textContent = spinning ? "Spin: on" : "Spin: off";
-  };
-  document.getElementById("file").onchange = async (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    setStatus(`Loading ${f.name}…`);
-    loadMesh({ fileBytes: new Uint8Array(await f.arrayBuffer()), fileName: f.name });
-  };
 
-  addEventListener("resize", () => {
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    } catch (e) {
+      setStatus("FAILED creating WebGL renderer: " + errText(e) + " — this device/browser may not support WebGL2.");
+      return;
+    }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
-  });
+    document.body.appendChild(renderer.domElement);
 
-  let last = performance.now();
-  renderer.setAnimationLoop(() => {
-    const now = performance.now(), dt = Math.min((now - last) / 1000, 0.1);
-    last = now;
-    if (mesh && spinning) mesh.rotation.y += dt * 0.25;
-    controls.update(camera);
-    renderer.render(scene, camera);
+    const spark = new SparkRenderer({ renderer });
+    scene.add(spark);
+    const controls = new SparkControls({ canvas: renderer.domElement });
+
+    let mesh = null, spinning = false;
+    function loadMesh(opts) {
+      if (mesh) { scene.remove(mesh); mesh.dispose(); }
+      setStatus("Loading splat… (28 MB)");
+      mesh = new SplatMesh({
+        ...opts,
+        onProgress: (e) => {
+          if (e.total > 0) setStatus(`Loading splat… ${Math.round(e.loaded / e.total * 100)}%`);
+        },
+        onLoad: () => setStatus("Loaded — drag to look around."),
+      });
+      scene.add(mesh);
+    }
+
+    const params = new URLSearchParams(location.search);
+    const PLY_URL = params.get("ply") || "https://cdn.jsdelivr.net/gh/lesterppo/colab-llm-deploy@main/3d/brush-lighthouse/lighthouse_trained.ply";
+    loadMesh({ url: PLY_URL });
+
+    document.getElementById("reset").onclick = () => {
+      camera.position.copy(HOME_POS);
+      camera.lookAt(HOME_TGT);
+      if (mesh) mesh.rotation.set(0, 0, 0);
+    };
+    document.getElementById("spin").onclick = (e) => {
+      spinning = !spinning;
+      e.target.textContent = spinning ? "Spin: on" : "Spin: off";
+    };
+    document.getElementById("file").onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      setStatus(`Loading ${f.name}…`);
+      loadMesh({ fileBytes: new Uint8Array(await f.arrayBuffer()), fileName: f.name });
+    };
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    let last = performance.now();
+    renderer.setAnimationLoop(() => {
+      const now = performance.now(), dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      if (mesh && spinning) mesh.rotation.y += dt * 0.25;
+      controls.update(camera);
+      renderer.render(scene, camera);
+    });
+  }
+  window.addEventListener("error", (e) => {
+    if (!statusEl.textContent.startsWith("Loaded")) {
+      setStatus("Viewer error: " + (e.message || "unknown error"));
+    }
   });
-  window.addEventListener("error", (e) => setStatus("Error: " + (e.message || "failed to load")));
+  window.addEventListener("unhandledrejection", (e) => {
+    if (!statusEl.textContent.startsWith("Loaded")) {
+      setStatus("Viewer error: " + errText(e.reason));
+    }
+  });
+  main();
 </script>
 </body>
 </html>
