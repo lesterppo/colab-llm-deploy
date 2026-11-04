@@ -216,7 +216,36 @@ read was wrong — the curve is flat until 1e-3, then jumps. The
 standing GREEN recipe for this scene is: clean scene, close
 framing (R 4.2, FOV 0.70), `--scale-loss-weight 1e-3`, 30,000
 steps. Untested combo that might fix the weak val_003 angle:
-textured scene + 1e-3. Arxiv rotation untouched; global active
+textured scene + 1e-3 (see below: the intermediate dose did not
+displace it). Arxiv rotation untouched; global active
 account was observed as kyu009009 at teardown (switched by another
 agent during the evening, not by this work — all sweep sessions
 used --token-file, never the global active).
+
+## Intermediate dose 3e-4 (2026-11-05, Peter's pick after the phone
+demo looked blurry)
+
+Question: does a dose between 1e-4 and 1e-3 keep the fog cleared AND
+keep enough splats for sharper renders? Only change vs the clean run,
+30,000 steps, T4, rc=0 in 285 s. Account note: cyc236es refused
+creation with 503, so one switch to ppoppo2052 (verified idle first);
+kyu008008/kyu009009 (VEC4 gate), cyc236ha (unknown T4), kyu110110
+(possibly weight-space) and ppoppo205 were deliberately avoided, and
+5stardse's token was found dead (refresh invalid-grant, 401) during
+the idle check. Result: **does NOT fix the blur.** 41,557 points
+(monotonic in dose, as expected); mean val PSNR 13.56 (15k) / 13.98
+(20k) / 14.34 (30k) — above 1e-4's 13.60 but far below 1e-3's 16.96.
+Visuals: val_000 softer than 1e-3's (more smear, softer roof edges),
+val_003 marginally better than 1e-3's (10.57 vs 9.69) but still hazy.
+Giant-splat fraction: 98 splats with max-scale > 0.5 (0.24%, vs 1e-3's
+~264 / 1.0%) but a larger single maximum (38 units vs 10) — so giant
+count alone does not explain the blur; the softness tracks the
+dose regime, not just the tail. Dose curve now complete: 1e-8 ->
+12.85, 1e-5 -> 13.22, 1e-4 -> 13.60, 3e-4 -> 14.34, 1e-3 -> 16.96,
+1e-2 -> collapse. The GREEN jump lives strictly between 3e-4 and
+1e-3. The 1e-3 model remains the best demo model. Remaining blur
+fixes, still not run: giant-splat stripping (cheap post-process,
+weakened as a sole explanation by this run) and textured scene +
+1e-3. Trained PLY kept locally as zanjic_trained_3e-4_30000.ply
+(41,557 points, 9.4 MB). Session stopped, registry deleted, arxiv
+rotation untouched.
