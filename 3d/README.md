@@ -11,10 +11,12 @@ a media file. Two scenes, plus the reusable phone viewer:
   which is the version that actually works on a phone.
 - [zanjic-church/](zanjic-church/) — the same pipeline applied to the
   Žanjic island monastery (Mala Gospa, Boka Bay, Montenegro): scene
-  script + Brush training that UNDERPERFORMED (30,000 steps, mean val
-  PSNR 12.98 dB, foggy — read that README before re-running) and the
-  procedural reconstruction that shipped instead, in three resolutions
-  up to 327,377 points.
+  scripts, the full Brush training campaign (GREEN at scale-loss
+  1e-3: 26,447 points, mean val PSNR 16.96 dB; densified variant
+  18,844 points, 18.65 dB — read that README's elimination record
+  before re-running anything), trained PLYs, phone demos, and a
+  handoff section for another agent. The procedural reconstruction
+  (up to 327,377 points) still wins on outright sharpness.
 - [viewer/](viewer/) — build a standalone splat-viewer HTML that works
   on a phone with no CDN access: three.js + Spark embedded as base64
   blob modules (including the three.core.js rewrite), a classic-script
