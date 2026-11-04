@@ -249,3 +249,52 @@ weakened as a sole explanation by this run) and textured scene +
 1e-3. Trained PLY kept locally as zanjic_trained_3e-4_30000.ply
 (41,557 points, 9.4 MB). Session stopped, registry deleted, arxiv
 rotation untouched.
+
+## Both remaining blur approaches tested (2026-11-05, Peter: "Test
+both remaining approaches")
+
+### Approach 1: giant-splat stripping (post-process, no retrain)
+
+Removed all splats with max exp(scale) > 0.5 from the GREEN 1e-3
+model: 163 giants removed (0.62%, max-scale up to 10.01), 26,284
+splats left. Correction to the earlier report: the giant count is
+163, not ~264 (that was a 2-decimal rounding of 0.0062 to 0.01).
+Test method, stated honestly: Brush 0.3.0 has NO render-a-PLY mode
+(its CLI only trains from a dataset), so the stripped model was
+tested two ways: (a) a purpose-built CPU Gaussian renderer
+(standard 3DGS EWA splatting, SH degree 3) rendering both models at
+the 8 val cameras, and (b) a phone demo built with the stripped PLY
+for judgment in Spark, the real viewer. The CPU renderer's absolute
+numbers are NOT comparable to Brush's (its renders come out much
+darker: mean ~31 vs Brush's ~111, i.e. it under-paints small splats
+relative to Brush/Spark), but the stripped-vs-original comparison
+under identical rendering is controlled. Result in the CPU
+renderer: stripping HURTS on all 8 views — mean PSNR vs GT 8.41
+stripped vs 9.54 original. In that renderer the giants are
+load-bearing: they paint the large sea/sky regions the sub-pixel
+dust cannot cover. Caveat: because the CPU renderer under-paints
+small splats, giants matter more there than they may in Spark, so
+the phone verdict on the stripped demo rules for the viewer
+experience, not this renderer. Stripped demo:
+zanjic_green_demo_stripped.html (15.0 MB, JS syntax-checked,
+26,284 points). Verdict: stripping is NOT validated as a blur fix
+by the renderer test; it stands or falls on the phone comparison.
+
+### Approach 2: textured scene + 1e-3 (Colab retrain)
+
+Textured dataset (the one that gave 14.30 at 1e-5) trained at the
+GREEN dose 1e-3, 30,000 steps, T4 ppoppo2052, rc=0 in 278 s.
+Result: **clear failure.** 26,912 points; mean val PSNR 11.85
+(15k) / 11.47 (20k) / 11.67 (30k) vs 1e-3-clean's 16.96, and the
+val_000 render is a smeary wash with the church barely
+recognisable. Mechanism (consistent with both texture runs):
+texture helps only when splats are plentiful (tex+1e-5: 14.30 >
+13.22); at the 1e-3 pruning regime (~27k splats) the model cannot
+afford the extra sea/sky detail, so texture hurts badly. Giants:
+81 (0.30%), max 6.31 — fewer giants than clean 1e-3, yet far worse,
+confirming again that giant count does not drive quality here.
+Trained PLY kept locally as zanjic_trained_tex_1e-3_30000.ply.
+Conclusion: the plain clean-scene 1e-3 model remains the best
+model for the demo. Both remaining blur approaches are now closed
+unless the phone comparison of the stripped demo says otherwise.
+Session stopped, registry deleted, arxiv rotation untouched.
