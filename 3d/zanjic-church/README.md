@@ -152,3 +152,29 @@ did prove: the scale-loss term DOES bite hard on splat survival, so
 the mechanism is real but the dose was wrong. Next probe, named but
 NOT run: `--scale-loss-weight 1e-5` (log-middle between the 1e-8
 default and the lethal 1e-2), evaluated with masked PSNR + visuals.
+
+## Scale-loss 1e-5 run (2026-11-04, "Further develop")
+
+The log-middle dose, the ONLY change vs the clean run: same clean
+dataset, cameras, 30,000 steps, T4, rc=0 in 371 s. Result: **still
+NOT GREEN, but a real, small, dose-response signal.** Substance guard
+passed: 154,958 points at 15k/20k/25k/30k (vs ~198k clean, vs 4 points
+at 1e-2 — the model survives). Mean val PSNR 13.22 dB at 15k, 13.17 at
+20k, 12.88 at 30k, vs clean 12.44 / 12.85 / 12.36: +0.78 / +0.32 /
++0.52, best overall 13.22 vs 12.85. Eval renders: church readable
+(red roofs, tower, nave) but still hazy, translucent smears over the
+lower half — fog reduced marginally, not eliminated. Dose-response
+so far: 1e-8 → 12.85 best, 1e-5 → 13.22 best, 1e-2 → collapse. The
+curve is shallow (+0.37 dB over three orders of magnitude), so a
+sweet spot between 1e-5 and 1e-2 (e.g. 1e-4, 1e-3) is unlikely to
+close the remaining ~2.8 dB to the 16 dB bar on its own. The remaining
+gap looks structural: Brush MCMC on perfectly flat synthetic sea/sky
+at 400 px. Next ideas, NOT run: (a) texture the scene — subtle
+procedural variation in sea/sky (clouds, sea mottling) so flat
+regions stop being flat, which attacks the root cause rather than
+the optimizer; (b) 640 px renders; (c) a 1e-4 / 1e-3 dose probe.
+Method note from this run: a foreground-masked PSNR was attempted
+and abandoned after verification — at close framing the island +
+church fill ~71% of the frame (confirmed two ways), so mask and
+all-pixel PSNR nearly coincide; the operative guards remain splat
+count (>=100k) + visual check, which is what caught the 1e-2 trap.
