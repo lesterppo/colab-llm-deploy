@@ -23,15 +23,10 @@
   button:active, label.btn:active { background: #fff; }
   #file { display: none; }
 </style>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
-    "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/2.4.0/spark.module.js"
-  }
-}
-</script>
+<!-- No static importmap: the script below probes several three.js hosts,
+     picks the first one this device can actually reach, and injects the
+     importmap pointing at it. A static jsDelivr-only importmap is exactly
+     what failed on the phone (FAILED at three.js: Failed to fetch). -->
 </head>
 <body>
 <div id="hud">
@@ -56,13 +51,58 @@
   const setStatus = (t) => { statusEl.textContent = t; };
   const errText = (e) => (e && e.message) ? e.message : String(e);
 
+  // Small Range probe: tests reachability without downloading the whole file.
+  async function probe(url) {
+    try {
+      const r = await fetch(url, { headers: { Range: "bytes=0-1023" } });
+      return r.ok || r.status === 206;
+    } catch (e) { return false; }
+  }
+  async function firstWorking(label, urls) {
+    for (const u of urls) {
+      setStatus(`Checking ${label}: ${new URL(u).hostname}…`);
+      if (await probe(u)) return u;
+    }
+    return null;
+  }
+
   async function main() {
+    // 1. Find a three.js host this device can reach (jsDelivr failed on phone).
+    const threeUrl = await firstWorking("three.js host", [
+      "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "https://unpkg.com/three@0.180.0/build/three.module.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.180.0/three.module.js",
+    ]);
+    if (!threeUrl) {
+      setStatus("FAILED: no three.js host reachable (jsDelivr, unpkg, cdnjs all failed) — check connection, then reload.");
+      return;
+    }
+    // cdnjs does not host three/addons, so probe addons separately.
+    const passUrl = await firstWorking("three addons host", [
+      "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/postprocessing/Pass.js",
+      "https://unpkg.com/three@0.180.0/examples/jsm/postprocessing/Pass.js",
+    ]);
+    const addonsBase = passUrl
+      ? passUrl.slice(0, -"postprocessing/Pass.js".length)
+      : "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/";
+    // Inject the importmap BEFORE any module import (a static one would
+    // have locked us to jsDelivr). Spark's own imports of "three" and
+    // "three/addons/..." resolve through this map.
+    const im = document.createElement("script");
+    im.type = "importmap";
+    im.textContent = JSON.stringify({ imports: {
+      "three": threeUrl,
+      "three/addons/": addonsBase,
+      "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/2.4.0/spark.module.js",
+    }});
+    document.head.appendChild(im);
+
     let THREE, sparkMod;
     try {
-      setStatus("Loading three.js…");
+      setStatus("Loading three.js via " + new URL(threeUrl).hostname + "…");
       THREE = await import("three");
     } catch (e) {
-      setStatus("FAILED at three.js: " + errText(e) + " — check connection, then reload.");
+      setStatus("FAILED at three.js (" + threeUrl + "): " + errText(e) + " — check connection, then reload.");
       return;
     }
     try {
