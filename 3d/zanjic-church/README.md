@@ -178,3 +178,45 @@ and abandoned after verification — at close framing the island +
 church fill ~71% of the frame (confirmed two ways), so mask and
 all-pixel PSNR nearly coincide; the operative guards remain splat
 count (>=100k) + visual check, which is what caught the 1e-2 trap.
+
+## Parallel sweep, 2026-11-04 ~23:40 HKT (Peter: "Further develop",
+10 Colab accounts now available) — GREEN
+
+Four variants trained in parallel, one T4 session per account, all
+30,000 steps, rc=0, all sessions stopped + registries deleted after:
+- **Textured scene + 1e-5** (cyc236es, 367 s): sea modulated +/-8%
+  by hit position, sky/sea_bg by soft directional cloud variation,
+  same geometry/cameras. 153,095 points; mean val PSNR 14.13 (15k) /
+  14.30 (20k) / 13.37 (30k). Texture helps (+1.08 over 1e-5 alone)
+  but does NOT reach GREEN on its own.
+- **Dose 1e-4** (ppoppo2052, 291 s): clean scene. 82,385 points;
+  13.34 / 13.51 / 13.60. Slight gain over 1e-5, still far from GREEN.
+- **Dose 1e-3** (5stardse, 281 s): clean scene. 26,447 points;
+  12.66 / 13.92 / **16.96**. Per-view at 30k: 19.21, 20.04, 15.57,
+  9.69, 17.84, 20.22, 19.51, 13.59. **GREEN on the declared bar:**
+  mean 16.96 dB >= 16, substance guard passed (26k points, not a
+  collapse), and the eval renders are visibly crisp on 6/8 views
+  (sharp red roofs, clean tower, structured sea) on HELD-OUT val
+  views, so this is genuine generalisation, not memorisation.
+  Qualified: val_003 remains hazy (9.69 dB) — one structurally hard
+  angle (worst in every run so far), and val_007 is middling
+  (13.59). The dose curve is now: 1e-8 -> 12.85, 1e-5 -> 13.22,
+  1e-4 -> 13.60, 1e-3 -> 16.96, 1e-2 -> collapse. The 1e-4 -> 1e-3
+  jump (+3.36) is a regime change, not a trend: aggressive pruning
+  to 26k well-placed splats beats 150k+ foggy ones. Trained PLY
+  (export_30000, 26,447 points, 6.0 MB) kept locally as
+  zanjic_trained_1e-3_30000.ply; it is now the candidate to ship
+  in the phone viewer in place of the procedural reconstruction.
+- **640 px renders** (kyu110110, 573 s): clean scene, defaults.
+  196,804 points; 12.67 / 12.37 / 11.95 — WORSE than 400 px.
+  Resolution alone is eliminated.
+
+Lesson overturned: the 1e-5 report's "too shallow to reach 16 dB"
+read was wrong — the curve is flat until 1e-3, then jumps. The
+standing GREEN recipe for this scene is: clean scene, close
+framing (R 4.2, FOV 0.70), `--scale-loss-weight 1e-3`, 30,000
+steps. Untested combo that might fix the weak val_003 angle:
+textured scene + 1e-3. Arxiv rotation untouched; global active
+account was observed as kyu009009 at teardown (switched by another
+agent during the evening, not by this work — all sweep sessions
+used --token-file, never the global active).
