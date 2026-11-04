@@ -298,3 +298,47 @@ Conclusion: the plain clean-scene 1e-3 model remains the best
 model for the demo. Both remaining blur approaches are now closed
 unless the phone comparison of the stripped demo says otherwise.
 Session stopped, registry deleted, arxiv rotation untouched.
+
+### Phone verdict on stripping (2026-11-05 07:03 HKT) — stripping CLOSED
+
+Peter compared the stripped demo with the original GREEN demo and
+the procedural lively v2 viewer on his phone: the stripped demo
+looks SIMILARLY BLURRY, and the procedural lively v2 looks HIGHER
+DEFINITION than any trained demo. Renderer A/B and phone now agree
+stripping does not help, so giant-splat stripping is closed as a
+blur fix. The procedural sharpness gap is expected, not a mystery:
+procedural is ray-traced geometry sampled at 87,528–327,377 points
+with tiny splats and exact colours, while the best trained model
+has 26,447 pruned splats. Procedural wins on sharpness; trained wins
+on being a real learned reconstruction.
+
+### Densification tuning at 1e-3 (2026-11-05 07:08–07:18 HKT)
+
+Last untried mechanism (not another dose): Brush refine knobs at
+the GREEN dose, as one pro-growth package — `--growth-grad-
+threshold 0.00004 -> 0.00001` (4x easier growth trigger),
+`--growth-select-fraction 0.1 -> 0.3` (3x more flagged splats
+grow), `--growth-stop-iter 15000 -> 30000` (growth runs the full
+training instead of stopping halfway). Clean scene, 30,000 steps,
+T4 ppoppo2052, session brush-zanjic-dn, rc=0 in 267 s.
+Counts trajectory: 68,798 (5k) -> 5,956 (10k) -> 4,244 (15k) ->
+4,250 (20k/25k) -> 18,844 (30k). Net density was NOT restored:
+18,844 < clean 1e-3's 26,447 — aggressive growth plus 1e-3 scale
+loss prunes harder mid-run, and the 30k rebound does not recover
+the deficit. Giants: 1,295 (6.87%), max 5.75 — far more giants
+proportionally than clean 1e-3 (163, 0.62%), yet PSNR still rose,
+confirming again that giant count does not drive quality.
+Mean val PSNR (30k, same local computation as all runs): 18.65 dB
+vs clean 1e-3's 16.96 (+1.69). Per view: 22.10, 19.48, 20.21,
+11.42, 23.29, 22.19, 15.64, 14.86 — beats clean 1e-3 on 6/8 views,
+loses on val_001 (19.48 vs 20.04) and val_006 (15.64 vs 19.51).
+Visuals: val_000 roofs look fairly clean-edged, walls/ground
+still soft; val_003 improved (11.42 vs 9.69) but still hazy and
+washed out (render mean 151 vs GT 96). Verdict: NUANCED, not a
+sharpness breakthrough — PSNR improved through better placement,
+not restored density, and the phone/Spark sharpness question is
+still open. Demo built for the phone comparison:
+zanjic_green_demo_densify.html (12.6 MB, JS syntax-checked,
+18,844 points). Trained PLY kept locally as
+zanjic_trained_dn_1e-3_30000.ply. Session stopped, registry
+deleted, arxiv rotation untouched.
