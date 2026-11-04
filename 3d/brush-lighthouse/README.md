@@ -73,6 +73,14 @@ Gaussian splatting viewer that reads PLY properties **by name**:
 Brush writes properties alphabetically (x, y, z last); a loader that
 assumes x/y/z first will misread it.
 
+For a phone, do NOT use a CDN viewer: the phone-proven presentation
+is the standalone builder in `../viewer/` (three.js + Spark embedded,
+no CDN — see that README for the four failure modes it fixes).
+`viewer.html` in this directory is that offline build for the
+lighthouse (libraries embedded, trained PLY loaded from its hosted
+URL with the same fallback pattern); regenerate it for a new splat
+with `../viewer/build_standalone.py` rather than hand-editing it.
+
 ## Files
 
 - `deploy_brush.py` — host orchestrator (this README's one command).
