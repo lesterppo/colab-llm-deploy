@@ -81,3 +81,31 @@ frame, and compare val PSNR before shipping any trained version.
   327,377 points, 81.2 MB PLY (shipped as 6.7 MB HTML + hosted PLY,
   with an 87,528-point embedded medium lively fallback after the full
   PLY fetch failed on the phone with "Failed to fetch").
+
+## GREEN attempt that FAILED (2026-11-04, do not repeat blindly)
+
+On the order "make the training GREEN", one retrain tried the obvious
+framing fix: orbit R 5.5 → 4.2, field of view 0.8727 → 0.70 rad, so the
+church covers ~1.7× more width and ~3× the pixels (dataset 48 train +
+8 val, 400×400, same Brush 0.3.0 defaults, 30,000 steps, T4, rc=0 in
+402 s). Result: **NOT GREEN — worse than the original.** Mean val
+PSNR 10.89 dB at 30,000 steps (per view 12.90, 14.19, 9.48, 8.35,
+14.30, 8.11, 11.72, 8.06), against the original's 12.98 dB; the
+15,000-step export was better (12.51 dB) than the final one, so longer
+training degraded it, and the eval renders are heavily fog-washed —
+the church is barely readable under translucent smears. Two confounds,
+so the framing hypothesis itself is NOT cleanly refuted: (1) the
+retrain's dataset was built from the LIVELY scene (wave caps, birds,
+flowers, second boat), not the clean pre-lively scene the original
+trained on — tiny view-inconsistent clutter like birds is exactly what
+a splat optimizer smears; (2) closer views see more of the flat sea
+plane at grazing angles. Next hypotheses, in order: (a) rebuild the
+dataset from the pre-lively scene at the original framing to isolate
+the clutter effect; (b) Brush optimizer knobs — `--scale-loss-weight`
+to penalise giant translucent splats, or a `--max-splats` cap; (c)
+higher render resolution (640 px) so thin structures resolve; (d)
+early stopping near 15,000 steps, since 15k beat 30k here. The green
+script and eval renders are kept locally in the author's workspace,
+not pushed, because the run is a negative result; this note exists so
+the next agent does not re-run the same framing fix expecting a
+different outcome.
