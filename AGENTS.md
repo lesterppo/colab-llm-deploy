@@ -33,7 +33,8 @@ through `/content/gen_config.json` so gen scripts never guess.
 Modality guides: [image/README.md](image/README.md),
 [video/README.md](video/README.md),
 [audio/README.md](audio/README.md),
-[3d/brush-lighthouse/README.md](3d/brush-lighthouse/README.md).
+[3d/README.md](3d/README.md) (lighthouse training, Zanjic church,
+and the standalone viewer builder).
 LLM details below.
 
 ## Proven on T4 — 3D (live-tested 2026-11-04)
@@ -41,6 +42,8 @@ LLM details below.
 | Recipe | What it does | Result |
 |---|---|---|
 | brush-lighthouse | Brush 0.3.0 trains a synthetic lighthouse-island splat (48 train + 8 val views, generated on the VM) | GREEN at 30,000 steps: 320.6 s train, 123,025 points, mean val PSNR 18.59 dB. One-kick wrapper's VM scripts re-tested the same evening at 4,000 steps: setup ready in 51 s, train ready, mean PSNR 16.42 dB, PLY verified. See [3d/brush-lighthouse/README.md](3d/brush-lighthouse/README.md) for the two Brush pitfalls that must not be re-learned (small-PNG "early eof", missing Vulkan ICD) and for the wrapper's live-test status. |
+| zanjic-church | Same pipeline on the Žanjic island monastery | NOT GREEN: 30,000 steps rc=0 in ~8 min, 266,426 points, but mean val PSNR 12.98 dB, foggy eval renders — a low subject over a huge flat sea disc. Shipped viewer uses the procedural reconstruction (up to 327,377 points). See [3d/zanjic-church/README.md](3d/zanjic-church/README.md). |
+| viewer (standalone) | Phone-proof splat viewer HTML for any scene | GREEN on the user's phone 2026-11-04 after four CDN versions failed: three.js + Spark embedded as base64 blob modules (with the three.core.js → three-core rewrite), classic-script error handling naming the failing step, splat URL load with embedded fallback. Build with `python3 3d/viewer/build_standalone.py --ply scene.ply --out scene.html`. Single-file ceiling ~100 MB (115 MB rejected, HTTP 413); rapid uploads hit HTTP 429. See [3d/viewer/README.md](3d/viewer/README.md). |
 
 ## Prerequisites
 
