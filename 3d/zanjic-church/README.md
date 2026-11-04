@@ -109,3 +109,25 @@ script and eval renders are kept locally in the author's workspace,
 not pushed, because the run is a negative result; this note exists so
 the next agent does not re-run the same framing fix expecting a
 different outcome.
+
+## Clean-scene rerun (2026-11-04, the delegated pick after the above)
+
+The pick was hypothesis (a) in its sharpest form: keep the GREEN
+framing (R=4.2, FOV 0.70, identical cameras — val_007's camera matches
+the failed run exactly) but remove ALL lively clutter and restore the
+original colours, i.e. the exact pre-lively scene the original 12.98 dB
+run trained on. Same Brush 0.3.0 defaults, 30,000 steps, T4, rc=0 in
+410 s. Result: **still NOT GREEN, but the experiment answered its
+question.** Mean val PSNR 12.44 dB at 15k, 12.85 dB at 20k, 12.36 dB at
+30k — the late-training collapse is GONE (failed run degraded
+12.51 → 10.89) and 30k improved by +1.47 dB over the failed run, so
+lively clutter WAS a real poison. But the ceiling is unchanged:
+~13 dB, same as the original wide clean run (12.98 dB), and the eval
+renders are still hazy — red roofs and tower readable, but translucent
+smears over the lower half and soft edges. So framing gives nothing
+and clutter removal only returns to the ~13 dB ceiling: the remaining
+fog is structural to Brush's defaults on this flat-textured synthetic
+scene, not framing or clutter. Next pick, named but NOT run: Brush
+optimizer knobs — `--scale-loss-weight` to penalise the giant
+translucent splats directly (the observed failure mode), since
+framing, clutter, and step count are now all eliminated as causes.
