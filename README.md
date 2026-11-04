@@ -11,6 +11,7 @@ generated video — then tear it down when you're done.
 | Video | `python3 deploy_media.py generate --kind video --model ltx23 --prompt "..."` | Text-to-video MP4 (LTX-2.3 22B); `--model ltx23-chain` for longer chained videos |
 | Audio | `python3 deploy_media.py generate --kind audio --model chatterbox --text1 "..."` | TTS + voice cloning (Chatterbox), lyrics-to-song (YuE2-3B, MiniMax Music 3) |
 | Music | `python3 deploy_media.py generate --kind music --model yue2-3b --lyrics "..."` | Lyrics-to-song audio (YuE2-3B, MiniMax Music 3 INT8) |
+| 3D | `python3 3d/brush-lighthouse/deploy_brush.py` | Trains a lighthouse-island Gaussian splat with Brush 0.3.0 (30,000 steps, ~6 min train, mean val PSNR 18.59 dB) |
 
 > **Status: live-tested on free Colab T4s.**
 > LLMs (2026-10-04): Qwen2.5-7B/14B, Gemma 4 12B, Qwen3.5 9B, MiMo-V2.6 9B —
@@ -21,8 +22,10 @@ generated video — then tear it down when you're done.
 > ~10.2s in ~38 min).
 > Audio (2026-10-05): Chatterbox TTS + zero-shot voice cloning, YuE2-3B
 > lyrics-to-song (40s in ~4 min), MiniMax Music 3 INT8 repack (30s in ~5 min).
+> 3D (2026-11-04): Brush lighthouse splat, 30,000 steps in ~6 min on a
+> free T4, mean val PSNR 18.59 dB.
 > See [AGENTS.md](AGENTS.md), [image/](image/), [video/](video/),
-> [audio/](audio/) for the full test matrix and pitfalls.
+> [audio/](audio/), [3d/](3d/) for the full test matrix and pitfalls.
 
 ## Architecture
 
