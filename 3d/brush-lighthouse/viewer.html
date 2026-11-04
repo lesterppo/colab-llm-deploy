@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Lighthouse Island at Dusk — 3D Splat</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a26;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  canvas { display: block; touch-action: none; }
+  #hud { position: fixed; top: 0; left: 0; right: 0; padding: 12px 14px;
+    color: #fff; background: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,0));
+    pointer-events: none; }
+  #hud h1 { margin: 0; font-size: 18px; }
+  #hud p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+  #status { margin-top: 6px; font-size: 13px; color: #ffd166; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px;
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.55)); }
+  button, label.btn { pointer-events: auto; appearance: none; border: 0;
+    border-radius: 999px; padding: 10px 16px; font-size: 15px;
+    background: rgba(255,255,255,.92); color: #12202c; }
+  button:active, label.btn:active { background: #fff; }
+  #file { display: none; }
+</style>
+<script>
+  // Runs BEFORE the module below, so a failed CDN import still shows a
+  // real error instead of the eternal "Loading splat…" text. The module
+  // script clears this timer by setting window.__viewerStarted = true.
+  window.addEventListener("error", function (e) {
+    var s = document.getElementById("status");
+    if (s) s.textContent = "Error loading viewer: " + (e.message || "library failed to load — check connection, then reload.");
+  }, true);
+  setTimeout(function () {
+    if (!window.__viewerStarted) {
+      var s = document.getElementById("status");
+      if (s) s.textContent = "Viewer library did not start (Spark/three.js CDN unreachable?) — reload the page, or tap “Open a PLY file” after it loads.";
+    }
+  }, 20000);
+</script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+    "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/2.4.0/spark.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="hud">
+  <h1>Lighthouse Island at Dusk</h1>
+  <p>Brush-trained Gaussian splat &middot; 123,025 points &middot; 30,000 steps</p>
+  <p>1 finger: look around &middot; 2 fingers: move &middot; Desktop: scroll to zoom</p>
+  <div id="status">Loading splat&hellip; (28 MB, may take a few seconds)</div>
+</div>
+<div id="bar">
+  <button id="reset">Reset view</button>
+  <button id="spin">Spin: off</button>
+  <label class="btn" for="file">Open a PLY file</label>
+  <input id="file" type="file" accept=".ply,.spz,.splat,.ksplat">
+</div>
+<script type="module">
+  import * as THREE from "three";
+  import { SparkRenderer, SplatMesh, SparkControls } from "@sparkjsdev/spark";
+
+  window.__viewerStarted = true;
+  const statusEl = document.getElementById("status");
+  const setStatus = (t) => { statusEl.textContent = t; };
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1a26);
+  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 1000);
+  const HOME_POS = new THREE.Vector3(4.6, 2.8, 4.6);
+  const HOME_TGT = new THREE.Vector3(0, 1.0, 0);
+  camera.position.copy(HOME_POS);
+  camera.lookAt(HOME_TGT);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  const spark = new SparkRenderer({ renderer });
+  scene.add(spark);
+  const controls = new SparkControls({ canvas: renderer.domElement });
+
+  let mesh = null, spinning = false;
+  function loadMesh(opts) {
+    if (mesh) { scene.remove(mesh); mesh.dispose(); }
+    setStatus("Loading splat…");
+    mesh = new SplatMesh({
+      ...opts,
+      onProgress: (e) => {
+        if (e.total > 0) setStatus(`Loading splat… ${Math.round(e.loaded / e.total * 100)}%`);
+      },
+      onLoad: () => setStatus("Loaded — drag to look around."),
+    });
+    scene.add(mesh);
+  }
+
+  // ?ply=<url> overrides the built-in scene; otherwise the trained PLY below.
+  const params = new URLSearchParams(location.search);
+  const PLY_URL = params.get("ply") || "https://cdn.jsdelivr.net/gh/lesterppo/colab-llm-deploy@main/3d/brush-lighthouse/lighthouse_trained.ply";
+  if (PLY_URL && !PLY_URL.startsWith("__")) {
+    loadMesh({ url: PLY_URL });
+  } else {
+    setStatus("No hosted PLY linked — tap “Open a PLY file” and pick lighthouse_trained.ply.");
+  }
+
+  document.getElementById("reset").onclick = () => {
+    camera.position.copy(HOME_POS);
+    camera.lookAt(HOME_TGT);
+    if (mesh) mesh.rotation.set(0, 0, 0);
+  };
+  document.getElementById("spin").onclick = (e) => {
+    spinning = !spinning;
+    e.target.textContent = spinning ? "Spin: on" : "Spin: off";
+  };
+  document.getElementById("file").onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setStatus(`Loading ${f.name}…`);
+    loadMesh({ fileBytes: new Uint8Array(await f.arrayBuffer()), fileName: f.name });
+  };
+
+  addEventListener("resize", () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  let last = performance.now();
+  renderer.setAnimationLoop(() => {
+    const now = performance.now(), dt = Math.min((now - last) / 1000, 0.1);
+    last = now;
+    if (mesh && spinning) mesh.rotation.y += dt * 0.25;
+    controls.update(camera);
+    renderer.render(scene, camera);
+  });
+  window.addEventListener("error", (e) => setStatus("Error: " + (e.message || "failed to load")));
+</script>
+</body>
+</html>
