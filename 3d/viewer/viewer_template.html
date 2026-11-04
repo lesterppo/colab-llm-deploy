@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Lighthouse Island at Dusk — 3D Splat</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1a26;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  canvas { display: block; touch-action: none; }
+  #hud { position: fixed; top: 0; left: 0; right: 0; padding: 12px 14px;
+    color: #fff; background: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,0));
+    pointer-events: none; }
+  #hud h1 { margin: 0; font-size: 18px; }
+  #hud p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+  #status { margin-top: 6px; font-size: 13px; color: #ffd166; word-break: break-word; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px;
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.55)); }
+  button, label.btn { pointer-events: auto; appearance: none; border: 0;
+    border-radius: 999px; padding: 10px 16px; font-size: 15px;
+    background: rgba(255,255,255,.92); color: #12202c; }
+  button:active, label.btn:active { background: #fff; }
+  #file { display: none; }
+</style>
+<!-- No static importmap: the script below probes several three.js hosts,
+     picks the first one this device can actually reach, and injects the
+     importmap pointing at it. A static jsDelivr-only importmap is exactly
+     what failed on the phone (FAILED at three.js: Failed to fetch). -->
+</head>
+<body>
+<div id="hud">
+  <h1>{{TITLE}}</h1>
+  <p>{{SUBTITLE}}</p>
+  <p>1 finger: look around &middot; 2 fingers: move &middot; Desktop: scroll to zoom</p>
+  <div id="status">Starting viewer…</div>
+</div>
+<div id="bar">
+  <button id="reset">Reset view</button>
+  <button id="spin">Spin: on</button>
+  <label class="btn" for="file">Open a PLY file</label>
+  <input id="file" type="file" accept=".ply,.spz,.splat,.ksplat">
+</div>
+<script>
+  // Classic script, NOT a module: it runs even if the CDN libraries fail,
+  // loads them one at a time with dynamic import() so a failure names the
+  // failing step, and falls back to Spark 2.1.0 if 2.4.0 fails to import.
+  // (The previous version used a static module script: a failed import
+  // produced only a blank "library failed to load" with no detail.)
+  const statusEl = document.getElementById("status");
+  const setStatus = (t) => { statusEl.textContent = t; };
+  const errText = (e) => (e && e.message) ? e.message : String(e);
+
+  // OFFLINE BUILD: the phone cannot reach any CDN, so the libraries are
+  // embedded below as base64 and turned into blob: module URLs.
+  // Standalone: the splat itself is embedded below as base64 (the Brush
+  // training run on this scene came out foggy, 12.98 dB mean val PSNR, so
+  // this file ships the crisp procedural reconstruction sampled from the
+  // same scene geometry instead; the trained PLY is kept alongside).
+  function b64ToBytes(b64) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  }
+  // Embedded medium lively fallback (87,528 points) - see PLY_URL below.
+  const MED_PLY_B64 = "{{FALLBACK_PLY_B64}}";
+  const THREE_B64 = "{{THREE_B64}}";
+  const THREE_CORE_B64 = "{{THREE_CORE_B64}}";
+  const PASS_B64 = "{{PASS_B64}}";
+  const SPARK_B64 = "{{SPARK_B64}}";
+
+  async function main() {
+    // Libraries are embedded in this file: build blob: module URLs and
+    // inject the importmap BEFORE any module import. Spark's own imports
+    // of "three" and "three/addons/postprocessing/Pass.js" resolve via it.
+    function blobUrl(b64) {
+      const bin = atob(b64);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return URL.createObjectURL(new Blob([arr], { type: "text/javascript" }));
+    }
+    const im = document.createElement("script");
+    im.type = "importmap";
+    im.textContent = JSON.stringify({ imports: {
+      "three": blobUrl(THREE_B64),
+      "three-core": blobUrl(THREE_CORE_B64),
+      "three/addons/postprocessing/Pass.js": blobUrl(PASS_B64),
+      "@sparkjsdev/spark": blobUrl(SPARK_B64),
+    }});
+    document.head.appendChild(im);
+
+    let THREE, sparkMod;
+    try {
+      setStatus("Loading embedded libraries…");
+      THREE = await import("three");
+    } catch (e) {
+      setStatus("FAILED at embedded three.js: " + errText(e));
+      return;
+    }
+    try {
+      setStatus("Loading Spark 2.4.0…");
+      sparkMod = await import("@sparkjsdev/spark");
+    } catch (e) {
+      setStatus("Spark 2.4.0 failed (" + errText(e) + ") — trying Spark 2.1.0…");
+      try {
+        sparkMod = await import("https://sparkjs.dev/releases/spark/2.1.0/spark.module.js");
+      } catch (e2) {
+        setStatus("FAILED at Spark (2.4.0 and 2.1.0): " + errText(e2) + " — check connection, then reload.");
+        return;
+      }
+    }
+    const { SparkRenderer, SplatMesh, SparkControls } = sparkMod;
+    if (!SparkRenderer || !SplatMesh || !SparkControls) {
+      setStatus("FAILED: Spark loaded but is missing SparkRenderer/SplatMesh/SparkControls — library version mismatch.");
+      return;
+    }
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1a26);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 1000);
+    const HOME_POS = new THREE.Vector3({{CAM_POS}});
+    const HOME_TGT = new THREE.Vector3({{CAM_TGT}});
+    camera.position.copy(HOME_POS);
+    camera.lookAt(HOME_TGT);
+
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    } catch (e) {
+      setStatus("FAILED creating WebGL renderer: " + errText(e) + " — this device/browser may not support WebGL2.");
+      return;
+    }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const spark = new SparkRenderer({ renderer });
+    scene.add(spark);
+    const controls = new SparkControls({ canvas: renderer.domElement });
+
+    let mesh = null, spinning = true;
+    function loadMesh(opts) {
+      if (mesh) { scene.remove(mesh); mesh.dispose(); }
+      setStatus("Loading splat…");
+      mesh = new SplatMesh({
+        ...opts,
+        onProgress: (e) => {
+          if (e.total > 0) setStatus(`Loading splat… ${Math.round(e.loaded / e.total * 100)}%`);
+        },
+        onLoad: () => setStatus(window.__loadNote || "Loaded — drag to look around."),
+      });
+      scene.add(mesh);
+    }
+
+    const params = new URLSearchParams(location.search);
+    const plyParam = params.get("ply");
+    // Primary splat: a URL if {{PLY_URL}} is set, else the embedded
+    // primary below. On any download failure, fall back to the embedded
+    // fallback splat if one was baked in; otherwise show the error.
+    const PLY_URL = plyParam || "{{PLY_URL}}";
+    const PRIMARY_PLY_B64 = "{{PRIMARY_PLY_B64}}";
+    async function loadPrimary() {
+      if (PLY_URL) {
+        setStatus("Fetching splat…");
+        try {
+          const resp = await fetch(PLY_URL);
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const buf = await resp.arrayBuffer();
+          window.__loadNote = "Loaded — full splat. Drag to look around.";
+          loadMesh({ fileBytes: new Uint8Array(buf), fileName: "scene.ply" });
+          return;
+        } catch (e) {
+          if (!MED_PLY_B64) {
+            setStatus("FAILED loading splat: " + errText(e) + " — check connection, then reload.");
+            return;
+          }
+          setStatus("Full splat unreachable (" + errText(e) + ") — loading embedded version…");
+        }
+      } else if (PRIMARY_PLY_B64) {
+        window.__loadNote = "Loaded — embedded splat. Drag to look around.";
+        loadMesh({ fileBytes: b64ToBytes(PRIMARY_PLY_B64), fileName: "scene.ply" });
+        return;
+      }
+      window.__loadNote = "Loaded — embedded fallback splat. Drag to look around.";
+      loadMesh({ fileBytes: b64ToBytes(MED_PLY_B64), fileName: "scene.ply" });
+    }
+    loadPrimary();
+
+    document.getElementById("reset").onclick = () => {
+      camera.position.copy(HOME_POS);
+      camera.lookAt(HOME_TGT);
+      if (mesh) mesh.rotation.set(0, 0, 0);
+    };
+    document.getElementById("spin").onclick = (e) => {
+      spinning = !spinning;
+      e.target.textContent = spinning ? "Spin: on" : "Spin: off";
+    };
+    document.getElementById("file").onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      setStatus(`Loading ${f.name}…`);
+      loadMesh({ fileBytes: new Uint8Array(await f.arrayBuffer()), fileName: f.name });
+    };
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    let last = performance.now();
+    renderer.setAnimationLoop(() => {
+      const now = performance.now(), dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      if (mesh && spinning) mesh.rotation.y += dt * 0.25;
+      controls.update(camera);
+      renderer.render(scene, camera);
+    });
+  }
+  window.addEventListener("error", (e) => {
+    if (!statusEl.textContent.startsWith("Loaded")) {
+      setStatus("Viewer error: " + (e.message || "unknown error"));
+    }
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    if (!statusEl.textContent.startsWith("Loaded")) {
+      setStatus("Viewer error: " + errText(e.reason));
+    }
+  });
+  main();
+</script>
+</body>
+</html>
