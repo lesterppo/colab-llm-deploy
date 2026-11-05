@@ -3,6 +3,14 @@
 Training a 3D scene on Colab, rather than serving a model or generating
 a media file. Two scenes, plus the reusable phone viewer:
 
+- [brush-colab-guide.md](brush-colab-guide.md) — the GENERAL guide:
+  how any agent uses Brush 0.3.0 on a free Colab T4 for any scene —
+  dataset rules (including the 16,387-byte PNG bug), Vulkan setup,
+  the full flag table, honest evaluation (PSNR traps included), the
+  tuning ladder, PLY parsing gotchas, phone-viewer shipping, and
+  session/account hygiene. Read this FIRST; the scene READMEs below
+  are worked examples, not the manual.
+
 - [brush-lighthouse/](brush-lighthouse/) — train a lighthouse-island
   Gaussian splatting scene with Brush 0.3.0 on a free T4, one command:
   `python3 3d/brush-lighthouse/deploy_brush.py`
