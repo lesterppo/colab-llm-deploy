@@ -8,7 +8,7 @@ generated video — then tear it down when you're done.
 |---|---|---|
 | LLM | `python3 deploy.py deploy --model auto` | Serves an Ollama/vLLM model behind a public Cloudflare-tunnel URL |
 | Image | `python3 deploy_media.py generate --kind image --model flux2-klein --prompt "..."` | Text-to-image PNG (FLUX.2-klein-4B, HiDream-I1 17B) |
-| Video | `python3 deploy_media.py generate --kind video --model ltx23 --prompt "..."` | Text-to-video MP4 (LTX-2.3 22B); `--model ltx23-chain` for longer chained videos |
+| Video | `python3 deploy_media.py generate --kind video --model ltx23 --prompt "..."` | Text-to-video MP4 (LTX-2.3 22B); `--model ltx23-chain` for longer chained videos; `--model minimax-h3` for MiniMax H3 33B 4-step INT8 with native audio (640x960, ~5s, GREEN 2026-11-11) |
 | Audio | `python3 deploy_media.py generate --kind audio --model chatterbox --text1 "..."` | TTS + voice cloning (Chatterbox), lyrics-to-song (YuE2-3B, MiniMax Music 3) |
 | Music | `python3 deploy_media.py generate --kind music --model yue2-3b --lyrics "..."` | Lyrics-to-song audio (YuE2-3B, MiniMax Music 3 INT8) |
 | 3D | `python3 3d/brush-lighthouse/deploy_brush.py` | Trains a lighthouse-island Gaussian splat with Brush 0.3.0 (30,000 steps, ~6 min train, mean val PSNR 18.59 dB); `3d/viewer/build_standalone.py` builds the phone-proof standalone viewer for any splat |
@@ -20,6 +20,9 @@ generated video — then tear it down when you're done.
 > HiDream-I1 17B Q4 (tight but workable).
 > Video (2026-10-05): LTX-2.3 22B Q3 (576x320 49f in ~7 min; 5-clip chain =
 > ~10.2s in ~38 min).
+> Video (2026-11-11): MiniMax H3 33B 4-step INT8 (640x960 124f in 1,979s,
+> peak VRAM 14,619/15,360 MB, free T4 kyu009009; MP4 verified 5.17s with
+> AAC 32kHz stereo audio). ~700MB VRAM headroom; 1MP/longer untested.
 > Audio (2026-10-05): Chatterbox TTS + zero-shot voice cloning, YuE2-3B
 > lyrics-to-song (40s in ~4 min), MiniMax Music 3 INT8 repack (30s in ~5 min).
 > 3D (2026-11-04): Brush lighthouse splat, 30,000 steps in ~6 min on a
