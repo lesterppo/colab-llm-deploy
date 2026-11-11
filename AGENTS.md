@@ -26,8 +26,8 @@ python3 3d/brush-lighthouse/deploy_brush.py [--session brush-lighthouse] [--step
 
 `deploy.py --model auto` detects GPU VRAM via nvidia-smi and picks the
 largest fitting recipe. `deploy_media.py --model` picks the pipeline:
-`flux2-klein | hidream-i1 | ltx23 | ltx23-chain | minimax-h3 | chatterbox |
-yue2 | minimax-music3`; prompts, sizes, lyrics, and TTS text go
+`flux2-klein | hidream-i1 | ltx23 | ltx23-chain | minimax-h3 | wan22-5b |
+chatterbox | yue2 | minimax-music3`; prompts, sizes, lyrics, and TTS text go
 through `/content/gen_config.json` so gen scripts never guess.
 
 Modality guides: [image/README.md](image/README.md),
