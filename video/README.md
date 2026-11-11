@@ -25,6 +25,32 @@ python3 deploy_media.py undeploy --session media-ltx23
 setup (pip + ~20.8GB of model downloads via the `hf` CLI) → poll → detached
 generation → poll → download MP4 → stop session.
 
+## Model: minimax-h3 — MiniMax H3 33B 4-step INT8 (GREEN 2026-11-11)
+
+- Files: `minimax-h3/setup.py`, `gen.py`
+- Stack: ComfyUI 0.45.0 (H3 nodes are core since 0.30), no custom nodes
+  for the T2V path, flags `--lowvram --cache-none --fast-disk`.
+- Weights (Comfy-Org/MiniMax-H3, 42.04GB total): FL2VA pruned INT8
+  diffusion 20.97GB + Qwen3-VL-32B NVFP4 encoder 15.69GB + 4-step turbo
+  LoRA 1.96GB + int8 video VAE 2.81GB + fp32 audio VAE 0.61GB.
+- Recipe: `er_sde` + `sgm_uniform`, 4 steps, Sigma Shift video 6 / audio 3.
+- Proven (2026-11-11, free T4, kyu009009, session `minimax-h3-4step`,
+  ~1h33m, not reclaimed): 640x960, 124 frames @24fps (~5.2s) in 1,979s,
+  peak VRAM 14,619/15,360 MB. MP4 verified on this VM (5.17s, AAC 32kHz
+  stereo, 6,017,812 bytes). Honest limits: ~700MB VRAM headroom; 1MP /
+  longer clips untested; int4 fallback staged but untested.
+- Pitfall (fixed in `gen.py`): ComfyUI 0.45 `SaveVideo` needs
+  `format: "auto", codec: "auto"` — `video/h264-mp4` passes validation
+  then writes no file (cost one full 32-min run).
+- License: MiniMax H3 Community License — excludes US, EU, UK, South Korea.
+
+```bash
+# From the repo root — 5s, 640x960, with native audio:
+python3 deploy_media.py generate --kind video --model minimax-h3 \
+    --prompt "A lighthouse on rugged cliffs at golden hour, waves crashing below, cinematic, with the sound of waves and wind" \
+    --out ./outputs
+```
+
 ## Model: ltx23 — LTX-2.3 22B distilled (verify license for non-test use)
 
 - Files: `ltx23/setup.py`, `gen.py` (single clip), `gen_chain.py` (chained)
