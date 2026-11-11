@@ -26,8 +26,8 @@ python3 3d/brush-lighthouse/deploy_brush.py [--session brush-lighthouse] [--step
 
 `deploy.py --model auto` detects GPU VRAM via nvidia-smi and picks the
 largest fitting recipe. `deploy_media.py --model` picks the pipeline:
-`flux2-klein | hidream-i1 | ltx23 | ltx23-chain | chatterbox | yue2 |
-minimax-music3`; prompts, sizes, lyrics, and TTS text go
+`flux2-klein | hidream-i1 | ltx23 | ltx23-chain | minimax-h3 | chatterbox |
+yue2 | minimax-music3`; prompts, sizes, lyrics, and TTS text go
 through `/content/gen_config.json` so gen scripts never guess.
 
 Modality guides: [image/README.md](image/README.md),
@@ -208,6 +208,16 @@ deepseek-coder-6.7b-q4, llama3.1-8b-q4.
     `optimized_attention`, O(chunk×seq) memory). Developed 2026-10-07
     for Wan 2.1, **not yet live-tested** — do not treat as proven until
     a run completes.
+13. **`colab.py exec_detach -f` takes a LOCAL path** (hermes-colab-cli
+    v3.3): the wrapper resolves it on the host and dies with
+    `exec-detach-no-file` if it does not exist locally. Passing a
+    remote path such as `-f /content/setup.py` always dies — pass the
+    local script path instead; the wrapper uploads it to
+    `/content/<basename>` itself. Bit `deploy_media.py` steps [3/6]/[4/6]
+    and the MiniMax H3 test driver on 2026-11-11 (fixed the same day).
+    Same class of silent failure: ComfyUI 0.45 `SaveVideo` needs
+    `format: "auto", codec: "auto"` — `video/h264-mp4` passes prompt
+    validation then writes no file (cost one full 32-min H3 run).
 
 ## Supervisor (surviving longer than one session)
 
