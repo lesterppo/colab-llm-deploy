@@ -22,6 +22,8 @@ Models:
   image/hidream-i1    HiDream-I1 17B (Q4_K_M GGUF), 1024px, 24 steps
   video/ltx23         LTX-2.3 22B distilled (Q3_K_M GGUF), 576x320 49f, ~7min
   video/ltx23-chain   LTX-2.3 chained clips (first-frame conditioning)
+  video/minimax-h3    MiniMax H3 33B (FL2VA pruned INT8 + NVFP4 32B encoder
+                      + 4-step turbo LoRA), 640x960 124f, ~33min, GREEN 2026-11-11
   audio/chatterbox    Chatterbox TTS 0.5B + zero-shot voice cloning
   audio/yue2          YuE2-3B lyrics-to-song
   audio/minimax-music3  MiniMax Music 3, INT8 repack (22GB -> 11.9GB)
@@ -83,6 +85,16 @@ MEDIA_MODELS = {
         "setup_timeout_min": 90, "gen_timeout_min": 180,
         "defaults": {"width": 576, "height": 320, "frames": 49,
                      "fps": 24, "steps": 8, "clips": 5}},
+    "minimax-h3": {
+        "kind": "video", "dir": "video/minimax-h3",
+        "setup_script": "setup.py", "gen_script": "gen.py",
+        "extra": [],
+        "setup_status": "/content/minimax_h3_setup_status.json",
+        "gen_status": "/content/minimax_h3_gen_status.json",
+        "output_key": "output",
+        "setup_timeout_min": 90, "gen_timeout_min": 90,
+        "defaults": {"width": 640, "height": 960, "frames": 124,
+                     "fps": 24, "steps": 4}},
     "chatterbox": {
         "kind": "audio", "dir": "audio/chatterbox",
         "setup_script": "setup.py", "gen_script": "gen.py",
@@ -237,13 +249,21 @@ def cmd_generate(a):
           f"open('/content/gen_config.json','w').write({json.dumps(cfg)!r})")
 
     print("[3/6] Running setup (downloads, detached)...")
-    colab("exec_detach", "-s", session, "-f", "/content/setup.py",
+    # exec_detach -f takes a LOCAL path: the wrapper resolves it on this
+    # machine and dies with exec-detach-no-file if it does not exist here
+    # (verified 2026-11-11: "-f /content/setup.py" died that way, since
+    # /content/setup.py is a remote path, not a local one). Pass the local
+    # script; exec_detach uploads it itself to /content/<basename>, the
+    # same remote path step [2/6] already uploaded it to (harmless re-upload).
+    colab("exec_detach", "-s", session, "-f",
+          os.path.join(model_dir, spec["setup_script"]),
           "--log", "/content/setup.log")
     wait_status(session, spec["setup_status"], spec["setup_timeout_min"],
                 "setup")
 
     print("[4/6] Running generation (detached)...")
-    colab("exec_detach", "-s", session, "-f", "/content/gen.py",
+    colab("exec_detach", "-s", session, "-f",
+          os.path.join(model_dir, spec["gen_script"]),
           "--log", "/content/gen.log")
     status = wait_status(session, spec["gen_status"], spec["gen_timeout_min"],
                          "gen")
@@ -282,6 +302,8 @@ def cmd_generate(a):
 def cmd_status(a):
     for path in ("/content/gen_status.json", "/content/ltx23_gen_status.json",
                  "/content/ltx23_chain_status.json",
+                 "/content/minimax_h3_gen_status.json",
+                 "/content/minimax_h3_setup_status.json",
                  "/content/comfy_setup_status.json",
                  "/content/hidream_setup_status.json",
                  "/content/ltx23_setup_status.json",
@@ -321,7 +343,8 @@ def main():
     g.add_argument("--kind", choices=["image", "video", "audio"], required=True)
     g.add_argument("--model", required=True,
                    help=("flux2-klein | hidream-i1 | ltx23 | ltx23-chain | "
-                         "chatterbox | yue2 | minimax-music3 | whisper"))
+                         "minimax-h3 | chatterbox | yue2 | minimax-music3 | "
+                         "whisper"))
     g.add_argument("--prompt",
                    help="image/video prompt (required for those kinds)")
     g.add_argument("--negative")
