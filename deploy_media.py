@@ -24,6 +24,8 @@ Models:
   video/ltx23-chain   LTX-2.3 chained clips (first-frame conditioning)
   video/minimax-h3    MiniMax H3 33B (FL2VA pruned INT8 + NVFP4 32B encoder
                       + 4-step turbo LoRA), 640x960 124f, ~33min, GREEN 2026-11-11
+  video/wan22-5b      Wan 2.2 TI2V-5B fp16 (10GB diffusion + fp8 UMT5-XXL
+                      encoder + 2.2 VAE), 832x480 81f, ~6min, GREEN 2026-11-12
   audio/chatterbox    Chatterbox TTS 0.5B + zero-shot voice cloning
   audio/yue2          YuE2-3B lyrics-to-song
   audio/minimax-music3  MiniMax Music 3, INT8 repack (22GB -> 11.9GB)
@@ -95,6 +97,16 @@ MEDIA_MODELS = {
         "setup_timeout_min": 90, "gen_timeout_min": 90,
         "defaults": {"width": 640, "height": 960, "frames": 124,
                      "fps": 24, "steps": 4}},
+    "wan22-5b": {
+        "kind": "video", "dir": "video/wan22-5b",
+        "setup_script": "setup.py", "gen_script": "gen.py",
+        "extra": [],
+        "setup_status": "/content/wan22_setup_status.json",
+        "gen_status": "/content/wan22_gen_status.json",
+        "output_key": "output",
+        "setup_timeout_min": 90, "gen_timeout_min": 90,
+        "defaults": {"width": 832, "height": 480, "frames": 81,
+                     "fps": 24, "steps": 20}},
     "chatterbox": {
         "kind": "audio", "dir": "audio/chatterbox",
         "setup_script": "setup.py", "gen_script": "gen.py",
@@ -304,6 +316,8 @@ def cmd_status(a):
                  "/content/ltx23_chain_status.json",
                  "/content/minimax_h3_gen_status.json",
                  "/content/minimax_h3_setup_status.json",
+                 "/content/wan22_gen_status.json",
+                 "/content/wan22_setup_status.json",
                  "/content/comfy_setup_status.json",
                  "/content/hidream_setup_status.json",
                  "/content/ltx23_setup_status.json",
@@ -343,8 +357,8 @@ def main():
     g.add_argument("--kind", choices=["image", "video", "audio"], required=True)
     g.add_argument("--model", required=True,
                    help=("flux2-klein | hidream-i1 | ltx23 | ltx23-chain | "
-                         "minimax-h3 | chatterbox | yue2 | minimax-music3 | "
-                         "whisper"))
+                         "minimax-h3 | wan22-5b | chatterbox | yue2 | "
+                         "minimax-music3 | whisper"))
     g.add_argument("--prompt",
                    help="image/video prompt (required for those kinds)")
     g.add_argument("--negative")
