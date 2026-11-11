@@ -51,6 +51,40 @@ python3 deploy_media.py generate --kind video --model minimax-h3 \
     --out ./outputs
 ```
 
+## Model: wan22-5b — Wan 2.2 TI2V-5B fp16 (GREEN 2026-11-12)
+
+- Files: `wan22-5b/setup.py`, `gen.py`
+- Stack: ComfyUI 0.45.0 (Wan 2.2 nodes are core), no custom nodes,
+  flags `--lowvram --cache-none --fast-disk`.
+- Weights (Comfy-Org/Wan-2.2, 18.15GB total): TI2V-5B fp16 diffusion
+  10.0GB + UMT5-XXL fp8 encoder 6.74GB + Wan 2.2 VAE 1.41GB.
+  Apache 2.0. The 2.2 VAE is the 16x16x4 high-compression VAE, ONLY
+  for the 5B model — the 14B models need the Wan 2.1 VAE.
+- Recipe: official `video_wan2_2_5B_ti2v.json` template, `uni_pc` +
+  `simple`, 20 steps, cfg 5.0, ModelSamplingSD3 shift 8.0.
+- Proven (2026-11-12, free T4, kyu009009, session `wan22-5b`, ~21 min
+  total, not reclaimed): TWO clips in one session, both verified on
+  this VM. I2V first (Peter's own Huangshan photo, 768x576, 81 frames
+  @24fps, 3.375s, 1,958,898 bytes, 415s, peak VRAM 13,679MB), then T2V
+  (Huangshan drone at sunrise, 832x480, 81 frames @24fps, 3.375s,
+  287,951 bytes, 370s, peak VRAM 14,011MB). Both SILENT — no native
+  audio in Wan 2.2, by design. Honest limits: ~1.3GB VRAM headroom at
+  832x480; 720p/121 frames untested on T4; I2V treats the image as a
+  loose reference, not a pixel-perfect first-frame lock (strict
+  first-frame I2V is the A14B model, which does not fit a T4).
+- I2V is manual-only: `deploy_media.py` has no `--image` flag.
+  Upload the image to `/content/ComfyUI/input/<name>.png`, put
+  `"image": "<name>.png"` in `/content/gen_config.json` (width/height
+  matching the photo's aspect), and run `gen.py` via `exec_detach`.
+  See `wan22-5b/README.md`.
+
+```bash
+# From the repo root — 3.4s, 832x480, silent:
+python3 deploy_media.py generate --kind video --model wan22-5b \
+    --prompt "Drone aerial view flying over Huangshan (Yellow Mountain) at sunrise, sea of clouds drifting between granite peaks and pine trees, golden light, cinematic slow drone movement" \
+    --out ./outputs
+```
+
 ## Model: ltx23 — LTX-2.3 22B distilled (verify license for non-test use)
 
 - Files: `ltx23/setup.py`, `gen.py` (single clip), `gen_chain.py` (chained)
