@@ -38,8 +38,15 @@ DEPLOY_LOG = "/content/deploy_llm.log"
 OLLAMA_VER = "0.40.11"
 CLOUDFLARED_VER = "2026.9.3"
 VLLM_VER = "0.30.0"
-LLAMACPP_VER = "b11552"
-LLAMACPP_BUILD = "11552"  # numeric part, for --version idempotency check
+LLAMACPP_VER = "b12669"
+LLAMACPP_BUILD = "12669"  # numeric part, for --version idempotency check
+# NOTE 2026-11-24: bumped b11552 -> b12669 for Inkling 2 Mini support
+# (inkling2_loop arch landed in PR #32694, >= b12600; PR #32704 fix in
+# b12611; PR #32799 tokenizer fix ~b12641). b11552 fails with
+# "unknown model architecture: 'inkling2_loop'". v1.0.0 (build 12359) is
+# also too old — never use "latest". Assets verified 2026-11-24:
+# llama-b12669-bin-ubuntu-cuda-12.8-x64.tar.gz +
+# cudart-llama-b12669-bin-ubuntu-cuda-12.8-x64.tar.gz exist.
 # llama.cpp ships as a plain tarball: bin/ inside a versioned top-level dir,
 # shared libs next to it, and CUDA runtime in a SEPARATE cudart tarball
 # (libggml-cuda.so cannot load without libcudart — without it the server
