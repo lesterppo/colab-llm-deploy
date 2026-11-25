@@ -234,5 +234,106 @@
       "proven_t4": true,
       "proven_date": "2026-11-24"
     }
+  },
+  "training_probes_note": "Training-track probes (2026-11-24/25), NOT serving recipes: each model was probed for NF4 QLoRA training on a free Colab T4 (transformers, one real training step), not deployed via deploy_llm.py. None of these is marked proven_t4 for inference/serving. deploy.py reads only models['models']; this key is documentation for the arXiv digest training track. Default stays Qwen3.5-9B. Full evidence: docs/small-model-training-probes-2026-11-25.md.",
+  "training_probes":   {
+    "alpie-seed-9b": {
+      "capability": "reasoning 8/8, tool-JSON 2/3, needle 4k PASS (8k OOM - T4 SDPA limit), decode 9.5 tok/s; Chinese/temp-0 not measured (battery aborted at 8k OOM)",
+      "hf_repo": "169Pi/Alpie_seed",
+      "license": "Apache 2.0",
+      "load_vram_gb": 7.12,
+      "loss": 0.2303,
+      "params_b": 9.41,
+      "peak_vram_gb": 7.57,
+      "probe_date": "2026-11-25",
+      "recipe_notes": "transformers 5.22.1 shipped; NF4 double-quant bf16, LoRA r16 (3.93M trainable); 18.8 GB single-file download slow unauthenticated - use a HF token",
+      "step_secs": 3.0,
+      "training_role": "first alternate",
+      "verdict": "GREEN"
+    },
+    "twil-8b": {
+      "capability": "reasoning 7/8, tool-JSON 1/3 strict (2/3 effective - single-tool output was correct JSON but ```json-fenced), Chinese 3/3, temp-0 1/1, needle 4k PASS (8k OOM), decode 9.8 tok/s",
+      "hf_repo": "webAI-Official/TwIL-8B",
+      "license": "webAI Non-Commercial 1.0",
+      "load_vram_gb": 5.36,
+      "loss": 0.1178,
+      "params_b": 8.79,
+      "peak_vram_gb": 5.85,
+      "probe_date": "2026-11-25",
+      "recipe_notes": "transformers 5.22.1 shipped; NF4, LoRA r16 (17.04M trainable); verbose thinking traces - use a generous generation budget; research/education only (non-commercial license)",
+      "step_secs": 6.7,
+      "training_role": "reasoning specialist",
+      "verdict": "GREEN"
+    },
+    "sensenova-loop-9b": {
+      "capability": "reasoning 4/8, tool-JSON 3/3, Chinese 3/3, temp-0 1/1, decode 1.7 tok/s; needle not measured",
+      "hf_repo": "sensenova/SenseNova-Loop-9B",
+      "license": "Apache 2.0",
+      "load_vram_gb": 7.35,
+      "loss": 0.1754,
+      "params_b": 9.66,
+      "peak_vram_gb": 8.42,
+      "probe_date": "2026-11-25",
+      "recipe_notes": "trust_remote_code (custom modeling_sensenova_loop.py); pass use_cache=False explicitly on all nested configs (harness fix, not a model defect); transformers 5.22.1; budget 2-6x a Qwen3.5-class run",
+      "step_secs": 15.2,
+      "training_role": "out of rotation - research only",
+      "verdict": "GREEN"
+    },
+    "qwen3.5-4b": {
+      "capability": "18/21; tool-JSON 3/3, reasoning 5/8, needle 4k+8k PASS, Chinese 3/3 (genuinely correct), temp-0 1/1, decode 10.8 tok/s",
+      "hf_repo": "Qwen/Qwen3.5-4B",
+      "license": "Apache 2.0",
+      "load_vram_gb": 2.91,
+      "loss": 0.1832,
+      "params_b": 4.7,
+      "peak_vram_gb": 3.58,
+      "probe_date": "2026-11-25",
+      "recipe_notes": "pip uninstall -y torchao (shipped 0.10.0) or drop conv1d from LoRA targets; DeltaNet LoRA proven - all 248 LoRA B grads nonzero, 32.46M trainable; depthwise conv1d kernels (groups=8192) stay frozen; reference DeltaNet kernels unless causal-conv1d + flash-linear-attention installed; base-only step 1.8 s / peak 3.33 GB",
+      "step_secs": 3.2,
+      "training_role": "4B general ablation arm",
+      "verdict": "GREEN"
+    },
+    "lfm3-1.7b": {
+      "capability": "17/21; reasoning 7/8, tool-JSON 1/3 (raw JSON - emits native <tool_call> format), needle 4k+8k PASS, instruction 2/2, temp-0 1/1, decode 18.0 tok/s; Chinese 3/3 is a substring artifact",
+      "hf_repo": "LiquidAI/LFM3-1.7B",
+      "license": "LFM Open License v1.0",
+      "load_vram_gb": 1.2,
+      "loss": 0.3153,
+      "params_b": 1.73,
+      "peak_vram_gb": 1.44,
+      "probe_date": "2026-11-25",
+      "recipe_notes": "requires trust_remote_code=True (custom modeling code); pip uninstall -y torchao; score tools in native <tool_call> format, not raw JSON; 13 depthwise conv kernels (~186k params) stay frozen under PEFT LoRA",
+      "step_secs": 0.9,
+      "training_role": "size/agent arm",
+      "verdict": "GREEN"
+    },
+    "dory-4b": {
+      "capability": "17/21; tool-JSON 3/3, reasoning 4/8 (weakest in series), needle 4k+8k PASS, Chinese 3/3, temp-0 1/1, decode 5.1 tok/s",
+      "hf_repo": "nvidia/NVIDIA-Nemotron-Labs-Dory1.0-4B-BF16",
+      "license": "OpenMDW-1.1",
+      "load_vram_gb": 2.84,
+      "loss": 0.1286,
+      "params_b": 4,
+      "peak_vram_gb": 3.24,
+      "probe_date": "2026-11-25",
+      "recipe_notes": "requires transformers git main (>=5.24); shipped 5.22.1 fails at load (layer_types validation); LoRA on the shared recurrent block trains stably at 1 step, loop count 2; loop count 4 / multi-step stability untested",
+      "step_secs": 2.8,
+      "training_role": "no rotation place",
+      "verdict": "GREEN"
+    },
+    "minicpm5-2b": {
+      "capability": "15/21 (lowest); tool-JSON 2/3, reasoning 5/8, instruction 1/2, needle 4k+8k PASS, Chinese 3/3, temp-0 1/1, decode 11.8 tok/s",
+      "hf_repo": "openbmb/MiniCPM5-2B",
+      "license": "Apache 2.0",
+      "load_vram_gb": 1.95,
+      "loss": 0.3134,
+      "params_b": 2.52,
+      "peak_vram_gb": 2.28,
+      "probe_date": "2026-11-25",
+      "recipe_notes": "cleanest port - native transformers 5.22.1, standard Llama, no workarounds; fallback only if both Qwen3.5-4B and LFM3 are unavailable",
+      "step_secs": 1.2,
+      "training_role": "fallback only",
+      "verdict": "GREEN"
+    }
   }
 }
