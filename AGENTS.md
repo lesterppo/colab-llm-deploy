@@ -85,6 +85,38 @@ LLM details below.
 | inkling-2-mini-iq3 | thinkingmachines/Inkling-2-Mini (UD-IQ3_XXS, 11.66GB) | GREEN 2026-11-24 — **llama.cpp bumped b11552 → b12669** (inkling2_loop needs ≥b12600; b11552 fails `unknown model architecture: 'inkling2_loop'`). Deep test @ctx16384: tool 5/6, reasoning **12/12**, needle 2/2 @10.3k/13.1k, ZH 3/3, decode 23.6 tok/s, VRAM 14.0/15.4GB; vision describe-test correct via mmproj F16 (manual `--mmproj`, driver has no mmproj support). See [docs/inkling-2-mini-deep-test.md](docs/inkling-2-mini-deep-test.md). **Q3_K_XL (13.63GB) FAILED on T4**: CUDA OOM crash mid-test (~475 MiB headroom). **ctx 32768 OOMs at load** — 16384 is the T4 max for this file. Agentic test same day (kyu009009): **13/14 corrected** — multi-step tool loops 3/3, error recovery 2/2, code agent 2/3 (bug-fix task failed twice, systematic — see doc), planning 2/2, memory 1/1, tool discipline 2/2, belief update 1/1; harness `inkling-2-mini-agentic-test.py`. See [docs/inkling-2-mini-agentic-test.md](docs/inkling-2-mini-agentic-test.md). Extensive agentic test same day (cyc236es): **39/41 corrected** (36/41 as-run) — tool loops 7/7, error recovery 4/5, code 9/10 (state-the-fix variant fixes the probe bug; remaining fails are loop-termination, not fixing), planning 6/6, memory 3/3, discipline 4/4, belief 3/3, long-context 3/3; harness `inkling-2-mini-agentic-test-ext.py`. See [docs/inkling-2-mini-agentic-test-ext.md](docs/inkling-2-mini-agentic-test-ext.md). |
 | nemotron-3.5-bolt-e4b-q4 | nemotron-3.5-bolt:e4b-q4_K_M | VM-side GREEN 2026-10-25, tunnel RED — NVIDIA Bolt E4B (Gemma 4 E4B base, 8B/4B eff, 7.9GB Ollama build, ctx8192 variant, VRAM 7,861/15,360 MiB, "What is 2+2?" → "The answer is four."). **Requires Ollama ≥0.40.10** (driver bumped 0.35.1→0.40.11; 0.35.1 fails the pull with HTTP 412). Two fresh trycloudflare subdomains both returned Cloudflare 403 "Your request was blocked" from this VM's egress while the tunnel process was healthy — so this recipe is NOT marked `proven_t4` until a tunnel smoke test passes; if you see the same 403, test the URL from a non-datacenter network before blaming the model. |
 
+## Training-track probes (2026-11-24/25)
+
+These seven models were probed for **training** (transformers NF4 QLoRA,
+one real training step on a free Colab T4), **not** served via
+`deploy_llm.py` — they are not deployable recipes and none is marked
+`proven_t4` for inference/serving. They live in `models.json` under the
+separate top-level `training_probes` key so `deploy.py` (which reads only
+`models["models"]`) is untouched. The catalog's `qwen3.5-4b-q4` Ollama
+entry above is a different thing — a queued, unproven *serving* recipe —
+and is left untouched. Default stays **Qwen3.5-9B**. Full evidence:
+[docs/small-model-training-probes-2026-11-25.md](docs/small-model-training-probes-2026-11-25.md).
+
+| Model | Training role | Peak VRAM at step | Capability headline | Key recipe note |
+|---|---|---|---|---|
+| Alpie Seed 9B (`169Pi/Alpie_seed`, 9.41B, Apache 2.0) | First alternate | 7.57 GB (load 7.12, step 3.0 s, loss 0.2303) | Reasoning 8/8, tool-JSON 2/3, needle 4k PASS | Prefer for reasoning/code papers; keep Qwen3.5-9B default until a head-to-head training run exists |
+| TwIL-8B (`webAI-Official/TwIL-8B`, 8.79B) | Reasoning specialist | 5.85 GB (load 5.36, step 6.7 s, loss 0.1178) | Reasoning 7/8, Chinese 3/3, needle 4k PASS | webAI Non-Commercial 1.0 (research/education only), never the general default; verbose thinking traces need generous budgets |
+| SenseNova Loop-9B (`sensenova/SenseNova-Loop-9B`, 9.66B, Apache 2.0) | Out of rotation — research only | 8.42 GB (load 7.35, step 15.2 s, loss 0.1754) | Reasoning 4/8, tool-JSON 3/3, 1.7 tok/s | Looped-architecture papers only; budget 2–6× a Qwen3.5-class run; pass `use_cache=False` explicitly on all nested configs |
+| Qwen3.5-4B (`Qwen/Qwen3.5-4B`, 4.7B, Apache 2.0) | 4B general ablation arm | 3.33–3.58 GB (load 2.91, loss 0.1832) | 18/21, tool-JSON 3/3, reasoning 5/8, needle 8k PASS | DeltaNet LoRA proven (all 248 LoRA B grads nonzero); `pip uninstall -y torchao` or drop `conv1d` from targets |
+| LFM3-1.7B (`LiquidAI/LFM3-1.7B`, 1.73B, LFM Open License v1.0) | Size/agent arm | 1.44 GB (load 1.20, step 0.9 s, loss 0.3153) | Reasoning 7/8, needle 8k PASS, 18.0 tok/s | Needs `trust_remote_code`; score tools in native `<tool_call>` format, not raw JSON; 13 depthwise conv kernels stay frozen |
+| Dory 4B (`nvidia/NVIDIA-Nemotron-Labs-Dory1.0-4B-BF16`, OpenMDW-1.1) | No rotation place | 3.24 GB (load 2.84, step 2.8 s, loss 0.1286) | Tool-JSON 3/3, reasoning 4/8, needle 8k PASS | Needs transformers git main (≥5.24); shipped 5.22.1 fails at load |
+| MiniCPM5-2B (`openbmb/MiniCPM5-2B`, 2.52B, Apache 2.0) | Fallback only | 2.28 GB (load 1.95, step 1.2 s, loss 0.3134) | 15/21 (lowest), tool-JSON 2/3, reasoning 5/8 | Cleanest port (native 5.22.1, standard Llama); fallback only if both Qwen3.5-4B and LFM3 are unavailable |
+
+Cross-cutting findings:
+- **Needle 8k via transformers generate OOMs on a T4 for every 8–9B model**
+  (SDPA math path on sm_75 materializes the [heads, seq, seq] score tensor)
+  — long-context eval for 8–9B needs llama.cpp/vLLM or chunked attention —
+  while **all four smaller models passed 8k**.
+- **Shipped torchao 0.10.0 breaks any LoRA target list containing a Conv1d**
+  — uninstall it (`pip uninstall -y torchao`) or drop the conv target.
+  Depthwise conv kernels (groups 2048/8192) cannot take PEFT LoRA at r=16
+  in either case; they stay frozen and are a negligible param count.
+
 ## The llamacpp backend
 
 `deploy_llm.py` supports `backend: "llamacpp"` (added 2026-10-11 for
