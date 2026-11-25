@@ -96,6 +96,9 @@ separate top-level `training_probes` key so `deploy.py` (which reads only
 entry above is a different thing — a queued, unproven *serving* recipe —
 and is left untouched. Default stays **Qwen3.5-9B**. Full evidence:
 [docs/small-model-training-probes-2026-11-25.md](docs/small-model-training-probes-2026-11-25.md).
+The probe scripts themselves — shared harness + per-model runners,
+including the Sigma 3B/8B diffusion-aware scripts — live in
+[training-probes/](training-probes/).
 
 | Model | Training role | Peak VRAM at step | Capability headline | Key recipe note |
 |---|---|---|---|---|
